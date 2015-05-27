@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"log"
 	"os"
+
+	"github.com/hackedu/maestro/baton"
 )
 
 func init() {
@@ -83,7 +85,9 @@ The options are:
 		fs.Usage()
 	}
 
+	go baton.Run()
 	m := http.NewServeMux()
+	m.Handle("/baton/", http.StripPrefix("/baton", baton.Handler()))
 	// TODO: Add API listener
 	// TODO: Add HTTP listener
 

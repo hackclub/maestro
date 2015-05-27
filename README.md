@@ -2,7 +2,8 @@
 
 **_Under Development_**
 
-Authors: @TheThirdOne, @zachlatta
+Authors: [@TheThirdOne](https://github.com/TheThirdOne),
+[@zachlatta](https://github.com/zachlatta)
 
 -------------------------------------------------------------------------------
 

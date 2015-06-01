@@ -1,9 +1,12 @@
 package baton
 
-import "github.com/hackedu/maestro/baton/echo"
-
+import (
+  "github.com/hackedu/maestro/baton/echo"
+  "github.com/hackedu/maestro/baton/giphy"
+)
 var modules = map[string]Module{
-	"echo": echo.Echo{},
+	"Echo": echo.Echo{},
+	"Giphy": giphy.Giphy{},
 }
 
 type Module interface {

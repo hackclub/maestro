@@ -54,7 +54,7 @@ func (h hub) run() {
 			resp := make(chan interface{})
 			module, ok := modules[msg.cmd.Module]
 			if !ok {
-				fmt.Println("the fuck is this module?")
+				fmt.Println(msg.cmd.Module,"not in",modules)
 				break
 			}
 

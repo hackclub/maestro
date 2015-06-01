@@ -157,8 +157,7 @@ func (h hub) run() {
 					if !ok {
 						close(resp)
 					}
-
-					bytes, err := json.Marshal(r)
+					bytes, err := json.Marshal(command{cmd.Module,cmd.Call,r}) //add in Module and Call info for client
 					if err != nil {
 					  log.Println("Error Marshaling")
 						log.Println(err)

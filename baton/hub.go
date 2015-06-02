@@ -70,7 +70,6 @@ func (h hub) run() {
 						log.Println(err)
 						break
 					}
-        
 					msg.conn.send <- bytes
 				}
 			}()

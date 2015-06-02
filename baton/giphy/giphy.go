@@ -10,7 +10,7 @@ import (
 type Giphy struct {
 }
 
-func (e Giphy) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
+func (g Giphy) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
 	var url string
 	switch cmd {
 	  case "search":

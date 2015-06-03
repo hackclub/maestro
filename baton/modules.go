@@ -7,7 +7,7 @@ import (
 )
 var modules = map[string]Module{
 	"Echo": echo.Echo{},
-	"Giphy": giphy.Giphy{},
+	"Giphy": giphy.Giphy{"dc6zaTOxFJmzC"},
 	"Neutrino": neutrino.Neutrino{"user-id","api-key"},
 }
 

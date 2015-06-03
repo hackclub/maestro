@@ -8,6 +8,7 @@ import (
   "github.com/gorilla/http"
 )
 type Giphy struct {
+  ApiKey string
 }
 
 func (g Giphy) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
@@ -15,21 +16,21 @@ func (g Giphy) RunCommand(cmd string, body interface{}, resp chan<- interface{})
 	switch cmd {
 	  case "search":
 	  	query := body.(map[string]interface{})["q"].(string)
-	    url = "http://api.giphy.com/v1/gifs/search?api_key=dc6zaTOxFJmzC&q="+query
+	    url = "http://api.giphy.com/v1/gifs/search?api_key="+g.ApiKey+"&q="+query
 	  case "getbyid":
 	    query := body.(map[string]interface{})["id"].(string)
-	    url = "http://api.giphy.com/v1/gifs/"+query+"?api_key=dc6zaTOxFJmzC"
+	    url = "http://api.giphy.com/v1/gifs/"+query+"?api_key="+g.ApiKey
 	  case "getbyids":
 	    query := body.(map[string]interface{})["ids"].(string)
-	    url = "http://api.giphy.com/v1/gifs?api_key=dc6zaTOxFJmzC&ids="+query
+	    url = "http://api.giphy.com/v1/gifs?api_key="+g.ApiKey+"&ids="+query
 	  case "translate":
 	    query := body.(map[string]interface{})["term"].(string)
-	    url = "http://api.giphy.com/v1/gifs/translate?api_key=dc6zaTOxFJmzC&s="+query
+	    url = "http://api.giphy.com/v1/gifs/translate?api_key="+g.ApiKey+"&s="+query
 	  case "random":
 	    query := body.(map[string]interface{})["tags"].(string)
-	    url = "http://api.giphy.com/v1/gifs/random?api_key=dc6zaTOxFJmzC&tags="+query
+	    url = "http://api.giphy.com/v1/gifs/random?api_key="+g.ApiKey+"&tags="+query
 	  case "trending":
-	    url = "http://api.giphy.com/v1/gifs/trending?api_key=dc6zaTOxFJmzC"
+	    url = "http://api.giphy.com/v1/gifs/trending?api_key="+g.ApiKey
 	  default:
 	    return errors.New("unknown command: " + cmd)
 	}

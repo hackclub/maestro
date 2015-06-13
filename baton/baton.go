@@ -1,9 +1,8 @@
 package baton
 
 import (
-	"fmt"
-	"time"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -30,13 +29,6 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-var h = hub{
-	conns:      make(map[conn]struct{}),
-	register:   make(chan conn),
-	unregister: make(chan conn),
-	receive:    make(chan msg),
-}
-
 // conn is the middleman between the websocket connection and the hub
 type conn struct {
 	ws   *websocket.Conn
@@ -44,7 +36,7 @@ type conn struct {
 }
 
 // readPump pumps messages from the websocket connection to the hub
-func (c conn) readPump() {
+func (c conn) readPump(h hub) {
 	defer func() {
 		h.unregister <- c
 		c.ws.Close()
@@ -62,7 +54,7 @@ func (c conn) readPump() {
 		if err != nil {
 			break
 		}
-		h.receive <- msg{c, data}
+		h.receive <- rawMsg{c, data}
 	}
 }
 
@@ -92,40 +84,6 @@ func (c conn) writePump() {
 		case <-ticker.C:
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
 				return
-			}
-		}
-	}
-}
-
-type msg struct {
-	conn conn
-	data []byte
-}
-
-type hub struct {
-	conns      map[conn]struct{}
-	register   chan conn
-	unregister chan conn
-	receive    chan msg
-}
-
-func (h hub) run() {
-	for {
-		select {
-		case c := <-h.register:
-			h.conns[c] = struct{}{}
-		case c := <-h.unregister:
-			if _, ok := h.conns[c]; ok {
-				delete(h.conns, c)
-				close(c.send)
-			}
-		case msg := <-h.receive:
-			// TODO: Process message data
-			select {
-			case msg.conn.send <- msg.data: // echo
-			default:
-				close(msg.conn.send)
-				delete(h.conns, msg.conn)
 			}
 		}
 	}

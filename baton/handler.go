@@ -1,8 +1,8 @@
 package baton
 
-import(
-	"net/http"
+import (
 	"log"
+	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/router"
@@ -12,6 +12,13 @@ func Handler() *mux.Router {
 	m := router.Baton()
 	m.Get(router.BatonConnect).HandlerFunc(serveWs)
 	return m
+}
+
+var h = hub{
+	conns:      make(map[conn]struct{}),
+	register:   make(chan conn),
+	unregister: make(chan conn),
+	receive:    make(chan rawMsg),
 }
 
 func Run() {
@@ -31,5 +38,5 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	c := conn{send: make(chan []byte, 256), ws: ws}
 	h.register <- c
 	go c.writePump()
-	c.readPump()
+	c.readPump(h)
 }

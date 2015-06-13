@@ -3,49 +3,68 @@ package giphy
 import (
   "errors"
   "log"
-  "bytes"
+  "fmt"
+  "net/url"
   "encoding/json"
-  "github.com/gorilla/http"
+  "net/http"
 )
 type Giphy struct {
   ApiKey string
 }
 
 func (g Giphy) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
-	var url string
+	var u url.URL
+	var err error
 	switch cmd {
 	  case "search":
 	  	query := body.(map[string]interface{})["q"].(string)
-	    url = "http://api.giphy.com/v1/gifs/search?api_key="+g.ApiKey+"&q="+query
+	    u, err = g.makeURL("gifs/search",url.Values{"q":{query}})
 	  case "getbyid":
-	    query := body.(map[string]interface{})["id"].(string)
-	    url = "http://api.giphy.com/v1/gifs/"+query+"?api_key="+g.ApiKey
+	    id := body.(map[string]interface{})["id"].(string)
+	    u, err = g.makeURL(fmt.Sprintf("gifs/%s",id),url.Values{})
 	  case "getbyids":
-	    query := body.(map[string]interface{})["ids"].(string)
-	    url = "http://api.giphy.com/v1/gifs?api_key="+g.ApiKey+"&ids="+query
+	    ids := body.(map[string]interface{})["ids"].(string)
+	    u, err = g.makeURL("gifs", url.Values{"ids":{ids}})
 	  case "translate":
-	    query := body.(map[string]interface{})["term"].(string)
-	    url = "http://api.giphy.com/v1/gifs/translate?api_key="+g.ApiKey+"&s="+query
+	    term := body.(map[string]interface{})["term"].(string)
+	    u, err = g.makeURL("gifs/translate", url.Values{"s":{term}})
 	  case "random":
-	    query := body.(map[string]interface{})["tags"].(string)
-	    url = "http://api.giphy.com/v1/gifs/random?api_key="+g.ApiKey+"&tags="+query
+	    tags := body.(map[string]interface{})["tags"].(string)
+	    u, err = g.makeURL("gifs/random", url.Values{"tags":{tags}})
 	  case "trending":
-	    url = "http://api.giphy.com/v1/gifs/trending?api_key="+g.ApiKey
+	    u, err = g.makeURL("gifs/trending",url.Values{})
 	  default:
 	    return errors.New("unknown command: " + cmd)
 	}
-	log.Println(url)
-	var tmp bytes.Buffer
-  if _, err := http.Get(&tmp, url); err != nil {
-      log.Fatalf("could not fetch: %v", err)
-      return nil
+	log.Println(u.String())
+	if err != nil{
+    return err
   }
+  res, err := http.Get(u.String())
+  if err != nil{
+    return err
+  }
+  defer res.Body.Close()
+  
   var out interface{}
-	if err := json.Unmarshal(tmp.Bytes(), &out); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
 		log.Println("nu")
 		log.Println(err)
 		return nil
 	}
 	resp <- out
 	return nil
+}
+func (g Giphy) makeURL(path string, v url.Values) (url.URL, error){
+  baseURL, _ := url.Parse("http://api.giphy.com/v1/")
+  v.Add("api_key",g.ApiKey)
+   
+  rel, err := url.Parse(path)
+  if err != nil{
+    return url.URL{}, err
+  }
+  
+  u := baseURL.ResolveReference(rel)
+  u.RawQuery = v.Encode()
+  return *u, nil
 }

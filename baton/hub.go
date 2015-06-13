@@ -47,14 +47,14 @@ func (h hub) run() {
 				log.Println(err)
 				break
 			}
-			
+
 			msg := msg{rawMsg.conn, cmd}
 
 			fmt.Println(cmd)
 			resp := make(chan interface{})
 			module, ok := modules[msg.cmd.Module]
 			if !ok {
-				fmt.Println(msg.cmd.Module,"not in",modules)
+				fmt.Println(msg.cmd.Module, "not in", modules)
 				break
 			}
 
@@ -64,9 +64,9 @@ func (h hub) run() {
 					if !ok {
 						close(resp)
 					}
-					bytes, err := json.Marshal(command{cmd.Module,cmd.Call,r}) //add in Module and Call info for client
+					bytes, err := json.Marshal(command{cmd.Module, cmd.Call, r}) //add in Module and Call info for client
 					if err != nil {
-					  log.Println("Error Marshaling")
+						log.Println("Error Marshaling")
 						log.Println(err)
 						break
 					}
@@ -75,7 +75,7 @@ func (h hub) run() {
 			}()
 
 			if err := module.RunCommand(cmd.Call, cmd.Body, resp); err != nil {
-			  fmt.Println(err)
+				fmt.Println(err)
 				fmt.Println("the fuck happened to this command?")
 				break
 			}

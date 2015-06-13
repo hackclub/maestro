@@ -1,8 +1,8 @@
 package baton
 
-import(
-	"net/http"
+import (
 	"log"
+	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/router"

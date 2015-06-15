@@ -50,7 +50,6 @@ func (h hub) run() {
 
 			msg := msg{rawMsg.conn, cmd}
 
-			fmt.Println(cmd)
 			resp := make(chan interface{})
 			module, ok := modules[msg.cmd.Module]
 			if !ok {
@@ -81,4 +80,15 @@ func (h hub) run() {
 			}
 		}
 	}
+}
+
+var h = hub{
+	conns:      make(map[conn]struct{}),
+	register:   make(chan conn),
+	unregister: make(chan conn),
+	receive:    make(chan rawMsg),
+}
+
+func Run() {
+	h.run()
 }

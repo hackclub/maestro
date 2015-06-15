@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net/http"
 	"log"
+	"net/http"
 	"os"
 
+	"github.com/hackedu/maestro/app"
 	"github.com/hackedu/maestro/baton"
 )
 
@@ -88,6 +89,7 @@ The options are:
 	go baton.Run()
 	m := http.NewServeMux()
 	m.Handle("/baton/", http.StripPrefix("/baton", baton.Handler()))
+	m.Handle("/", app.Handler())
 	// TODO: Add API listener
 	// TODO: Add HTTP listener
 

@@ -1,7 +1,12 @@
 function Maestro(){
   var self = this;
   this.ws = new WebSocket("ws://localhost:1759/baton/connect")
+  var id = "";
   this.ws.onmessage = function(message){
+    if(!id){
+      id = message.data;
+      return;
+    }
     var data = JSON.parse(message.data);
     if(self[data.module]){
       self[data.module].process(data);
@@ -9,8 +14,11 @@ function Maestro(){
       console.error("Module: " + data.module + " does not exist.");
     }
   };
+  
+  var counter = 0;
   this.send = function(module,call,body){
-    this.ws.send(JSON.stringify({module:module,call:call,body:body}));
+    this.ws.send(JSON.stringify({module:module,call:call,id:id+"-"+counter,body:body}));
+    counter++;
   };
   this.Echo = {
     echo:function(e){

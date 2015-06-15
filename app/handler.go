@@ -7,18 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	
+	"github.com/GeertJohan/go.rice"
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/router"
 )
 
-var (
-	// StaticDir is the directory containing static assets.
-	StaticDir = filepath.Join(defaultBase("github.com/hackedu/maestro/app"), "static")
-)
-
 func Handler() *mux.Router {
 	m := router.App()
-	m.Get(router.AppStatic).Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(StaticDir))))
+	m.Get(router.AppStatic).Handler(http.StripPrefix("/static/", http.FileServer(rice.MustFindBox("static").HTTPBox())))
 	return m
 }
 

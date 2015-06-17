@@ -14,17 +14,6 @@ func Handler() *mux.Router {
 	return m
 }
 
-var h = hub{
-	conns:      make(map[conn]struct{}),
-	register:   make(chan conn),
-	unregister: make(chan conn),
-	receive:    make(chan rawMsg),
-}
-
-func Run() {
-	h.run()
-}
-
 func serveWs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)

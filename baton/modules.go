@@ -1,9 +1,9 @@
 package baton
 
 import (
-	"github.com/hackedu/maestro/baton/echo"
-	"github.com/hackedu/maestro/baton/giphy"
-	"github.com/hackedu/maestro/baton/neutrino"
+	"github.com/hackedu/maestro/baton/modules/echo"
+	"github.com/hackedu/maestro/baton/modules/giphy"
+	"github.com/hackedu/maestro/baton/modules/neutrino"
 )
 
 var modules = map[string]Module{

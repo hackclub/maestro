@@ -40,45 +40,57 @@ func (h hub) run() {
 				close(c.send)
 			}
 		case rawMsg := <-h.receive:
-			fmt.Println(rawMsg)
 			var cmd command
 			if err := json.Unmarshal(rawMsg.data, &cmd); err != nil {
 				fmt.Println("nu")
 				log.Println(err)
 				break
 			}
-
-			msg := msg{rawMsg.conn, cmd}
-
 			fmt.Println(cmd)
-			resp := make(chan interface{})
-			module, ok := modules[msg.cmd.Module]
-			if !ok {
-				fmt.Println(msg.cmd.Module, "not in", modules)
-				break
-			}
-
-			go func() {
-				for {
-					r, ok := <-resp
-					if !ok {
-						close(resp)
-					}
-					bytes, err := json.Marshal(command{cmd.Module, cmd.Call, r}) //add in Module and Call info for client
-					if err != nil {
-						log.Println("Error Marshaling")
-						log.Println(err)
-						break
-					}
-					msg.conn.send <- bytes
-				}
-			}()
-
-			if err := module.RunCommand(cmd.Call, cmd.Body, resp); err != nil {
-				fmt.Println(err)
-				fmt.Println("the fuck happened to this command?")
-				break
-			}
+			msg := msg{rawMsg.conn, cmd}
+			processMessage(msg)
 		}
 	}
+}
+
+func processMessage(message msg) {
+	resp := make(chan interface{})
+	module, ok := modules[message.cmd.Module]
+	if !ok {
+		fmt.Println(message.cmd.Module, "not in", modules)
+		return
+	}
+
+	go func() {
+		for {
+			r, ok := <-resp
+			if !ok {
+				close(resp)
+				break
+			}
+			bytes, err := json.Marshal(command{message.cmd.Module, message.cmd.Call, r}) //add in Module and Call info for client
+			if err != nil {
+				log.Println("Error Marshaling")
+				log.Println(err)
+				break
+			}
+			message.conn.send <- bytes
+		}
+	}()
+	go func() {
+		if err := module.RunCommand(message.cmd.Call, message.cmd.Body, resp); err != nil {
+			fmt.Println(err)
+		}
+	}()
+}
+
+var h = hub{
+	conns:      make(map[conn]struct{}),
+	register:   make(chan conn),
+	unregister: make(chan conn),
+	receive:    make(chan rawMsg),
+}
+
+func Run() {
+	h.run()
 }

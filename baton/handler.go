@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	
+
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/router"
 )
@@ -14,7 +14,9 @@ func Handler() *mux.Router {
 	m.Get(router.BatonConnect).HandlerFunc(serveWs)
 	return m
 }
+
 var i = 0
+
 func serveWs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)

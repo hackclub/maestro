@@ -2,7 +2,7 @@ package app
 
 import (
 	"net/http"
-	
+
 	"github.com/GeertJohan/go.rice"
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/router"

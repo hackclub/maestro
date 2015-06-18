@@ -22,7 +22,7 @@ func (e Echo) RunCommand(cmd string, body interface{}, resp chan<- interface{}) 
 
 func (e Echo) Handler() *mux.Router {
 	m := mux.NewRouter()
-	m.Path("*").HandlerFunc(echo)
+	m.PathPrefix("/").HandlerFunc(echo)
 	return m
 }
 func echo(w http.ResponseWriter, r *http.Request) {

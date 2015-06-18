@@ -89,9 +89,8 @@ The options are:
 	go baton.Run()
 	m := http.NewServeMux()
 	m.Handle("/baton/", http.StripPrefix("/baton", baton.Handler()))
+	m.Handle("/webhooks/", http.StripPrefix("/webhooks", baton.WebhookHandler()))
 	m.Handle("/", app.Handler())
-	// TODO: Add API listener
-	// TODO: Add HTTP listener
 
 	log.Print("Listening on ", *httpAddr)
 	if err := http.ListenAndServe(*httpAddr, m); err != nil {

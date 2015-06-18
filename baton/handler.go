@@ -1,6 +1,7 @@
 package baton
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -33,4 +34,13 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	c.send <- []byte(strconv.Itoa(i))
 	i++
 	c.readPump(h)
+}
+
+func WebhookHandler() *mux.Router {
+	m := mux.NewRouter()
+	for name, module := range modules {
+		//PathPrefix needed to make it behave like http.Handle
+		m.PathPrefix(fmt.Sprintf("/%s", name)).Handler(http.StripPrefix(fmt.Sprintf("/%s", name), module.Handler()))
+	}
+	return m
 }

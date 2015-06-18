@@ -1,6 +1,7 @@
 package baton
 
 import (
+	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/baton/modules/echo"
 	"github.com/hackedu/maestro/baton/modules/giphy"
 	"github.com/hackedu/maestro/baton/modules/neutrino"
@@ -15,4 +16,5 @@ var modules = map[string]Module{
 
 type Module interface {
 	RunCommand(cmd string, body interface{}, resp chan<- interface{}) error
+	Handler() *mux.Router
 }

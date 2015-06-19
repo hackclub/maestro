@@ -1,6 +1,7 @@
 package twilio
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -30,7 +31,7 @@ func (t Twilio) RunCommand(cmd string, body interface{}, resp chan<- interface{}
 	return nil
 }
 
-func (t Twilio) PostForm(url string, form url.Values) (*http.Response, error) {
+func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
@@ -46,5 +47,23 @@ func (t Twilio) PostForm(url string, form url.Values) (*http.Response, error) {
 
 func (t Twilio) Handler() *mux.Router {
 	m := mux.NewRouter()
+	m.Path("/sms").HandlerFunc(sms)
 	return m
+}
+
+func sms(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		fmt.Println(err)
+	}
+	out := make(map[string]string)
+	for name, val := range r.PostForm {
+		out[name] = val[0]
+	}
+	bytes, err := json.Marshal(out)
+	if err != nil {
+		fmt.Println("Error Marshaling Form")
+		return
+	}
+	fmt.Println(string(bytes))
 }

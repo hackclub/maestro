@@ -1,6 +1,6 @@
 function Maestro(){
   var self = this;
-  this.ws = new WebSocket("ws://" + window.location.host + ":" + window.location.port + "/baton/connect");
+  this.ws = new WebSocket("ws://" + window.location.host + "/baton/connect");
   var id = "";
   this.ws.onmessage = function(message){
     if(!id){

@@ -2,6 +2,7 @@ package twilio
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,22 +13,59 @@ import (
 
 type Twilio struct {
 	UserId, ApiKey string
+	smsCallbacks   []callback
+}
+
+func NewTwilio(userId string, apiKey string) Twilio {
+	return Twilio{userId, apiKey, make([]callback, 0)}
+}
+
+type callback struct {
+	number string
+	resp   chan<- interface{}
 }
 
 var client = &http.Client{}
 
 func (t Twilio) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
 	newBody := body.(map[string]interface{})
-	to := newBody["to"].(string)
-	from := newBody["from"].(string)
-	message := newBody["body"].(string)
+	switch cmd {
+	case "send-sms":
+		return t.sendSMS(newBody, resp)
+	case "recieve-sms":
+		return t.recieveSMS(newBody, resp)
+	case "send-call":
+		return nil
+	case "recieve-call":
+		return nil
+	default:
+		return errors.New("unknown command: " + cmd)
+	}
+}
+
+func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) error {
+	to := body["to"].(string)
+	from := body["from"].(string)
+	message := body["body"].(string)
 	form := url.Values{"To": {to}, "From": {from}, "Body": {message}}
 
-	_, err := t.PostForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.UserId), form)
+	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.UserId), form)
 	if err != nil {
 		return err
 	}
+	defer res.Body.Close()
 
+	//Todo: filter what exports, currently it gives the account_sid probably not a good idea
+	var out interface{}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		return nil
+	}
+	resp <- out
+	return nil
+}
+func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
+	from := body["from"].(string)
+	t.smsCallbacks = append(t.smsCallbacks, callback{from, resp})
 	return nil
 }
 
@@ -47,11 +85,14 @@ func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 
 func (t Twilio) Handler() *mux.Router {
 	m := mux.NewRouter()
-	m.Path("/sms").HandlerFunc(sms)
+
+	m.Path("/sms").HandlerFunc(makeSMS(t))
 	return m
 }
-
-func sms(w http.ResponseWriter, r *http.Request) {
+func makeSMS(t Twilio) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) { t.sms(w, r) }
+}
+func (t Twilio) sms(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		fmt.Println(err)
@@ -64,6 +105,14 @@ func sms(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("Error Marshaling Form")
 		return
+	}
+	fmt.Println("callbacks")
+	for _, callback := range t.smsCallbacks {
+		fmt.Println(callback, out["from"])
+		if callback.number == out["from"] {
+			fmt.Println("callback")
+			callback.resp <- out
+		}
 	}
 	fmt.Println(string(bytes))
 }

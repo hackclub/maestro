@@ -1,6 +1,6 @@
 function Maestro(){
   var self = this;
-  this.ws = new WebSocket("ws://localhost:1759/baton/connect")
+  this.ws = new WebSocket("ws://" + window.location.host + ":" + window.location.port + "/baton/connect");
   var id = "";
   this.ws.onmessage = function(message){
     if(!id){
@@ -61,6 +61,14 @@ function Maestro(){
     }
   };
   this.Neutrino = {
+    process:function(e){
+      console.log(e.body);
+    }
+  };
+  this.Twilio = {
+    sendSms:function(to,from,body){
+      self.send("Twilio","send-sms",{to:to,from:from,body:body});
+    },
     process:function(e){
       console.log(e.body);
     }

@@ -23,6 +23,7 @@ var (
 type callback struct {
 	number string
 	resp   chan<- interface{}
+	data   string
 }
 
 var client = &http.Client{}
@@ -35,7 +36,7 @@ func (t Twilio) RunCommand(cmd string, body interface{}, resp chan<- interface{}
 	case "recieve-sms":
 		return t.recieveSMS(newBody, resp)
 	case "send-call":
-		return nil
+		return t.makeCall(newBody, resp)
 	case "recieve-call":
 		return t.recieveCall(newBody, resp)
 	default:
@@ -55,23 +56,36 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 	}
 	defer res.Body.Close()
 
-	//Todo: filter what exports, currently it gives the account_sid probably not a good idea
-	var out interface{}
+	var out map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
-		return nil
+		return err
 	}
+	delete(out, "account_sid")
 	resp <- out
+	return nil
+}
+func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) error {
+	to := body["to"].(string)
+	from := body["from"].(string)
+	twiml := body["twiml"].(string)
+	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://6d3e7ae8.ngrok.io/webhooks/Twilio/call"}} //temporary
+	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
+	_, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
 	from := body["from"].(string)
-	smsCallbacks = append(smsCallbacks, callback{from, resp})
+	smsCallbacks = append(smsCallbacks, callback{from, resp, ""})
 	return nil
 }
 
 func (t Twilio) recieveCall(body map[string]interface{}, resp chan<- interface{}) error {
 	from := body["from"].(string)
-	callCallbacks = append(callCallbacks, callback{from, resp})
+	twiml := body["twiml"].(string)
+	callCallbacks = append(callCallbacks, callback{from, resp, twiml})
 	return nil
 }
 func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
@@ -104,6 +118,7 @@ func sms(w http.ResponseWriter, r *http.Request) {
 	for name, val := range r.PostForm {
 		out[name] = val[0]
 	}
+	delete(out, "AccountSid")
 	for _, callback := range smsCallbacks {
 		if callback.number == out["From"] {
 			callback.resp <- out
@@ -121,17 +136,24 @@ func call(w http.ResponseWriter, r *http.Request) {
 	for name, val := range r.PostForm {
 		out[name] = val[0]
 	}
-	for _, callback := range callCallbacks {
+	delete(out, "AccountSid")
+	for i, callback := range callCallbacks {
 		if "inbound" == out["Direction"] {
 			if callback.number == out["Caller"] {
+				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
 				callback.resp <- out
+				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
+				break
 			}
 		} else {
 			if callback.number == out["Called"] {
+				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
 				callback.resp <- out
+				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
+				break
 			}
 		}
 	}
 
-	fmt.Println(out)
+	fmt.Println(callCallbacks)
 }

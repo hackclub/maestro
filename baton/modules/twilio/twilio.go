@@ -13,12 +13,12 @@ import (
 
 type Twilio struct {
 	UserId, ApiKey string
-	smsCallbacks   []callback
 }
 
-func NewTwilio(userId string, apiKey string) Twilio {
-	return Twilio{userId, apiKey, make([]callback, 0)}
-}
+var (
+	smsCallbacks  = make([]callback, 0)
+	callCallbacks = make([]callback, 0)
+)
 
 type callback struct {
 	number string
@@ -37,7 +37,7 @@ func (t Twilio) RunCommand(cmd string, body interface{}, resp chan<- interface{}
 	case "send-call":
 		return nil
 	case "recieve-call":
-		return nil
+		return t.recieveCall(newBody, resp)
 	default:
 		return errors.New("unknown command: " + cmd)
 	}
@@ -65,10 +65,15 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 }
 func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
 	from := body["from"].(string)
-	t.smsCallbacks = append(t.smsCallbacks, callback{from, resp})
+	smsCallbacks = append(smsCallbacks, callback{from, resp})
 	return nil
 }
 
+func (t Twilio) recieveCall(body map[string]interface{}, resp chan<- interface{}) error {
+	from := body["from"].(string)
+	callCallbacks = append(callCallbacks, callback{from, resp})
+	return nil
+}
 func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -86,13 +91,11 @@ func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 func (t Twilio) Handler() *mux.Router {
 	m := mux.NewRouter()
 
-	m.Path("/sms").HandlerFunc(makeSMS(t))
+	m.Path("/sms").HandlerFunc(sms)
+	m.Path("/call").HandlerFunc(call)
 	return m
 }
-func makeSMS(t Twilio) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) { t.sms(w, r) }
-}
-func (t Twilio) sms(w http.ResponseWriter, r *http.Request) {
+func sms(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		fmt.Println(err)
@@ -101,18 +104,34 @@ func (t Twilio) sms(w http.ResponseWriter, r *http.Request) {
 	for name, val := range r.PostForm {
 		out[name] = val[0]
 	}
-	bytes, err := json.Marshal(out)
-	if err != nil {
-		fmt.Println("Error Marshaling Form")
-		return
-	}
-	fmt.Println("callbacks")
-	for _, callback := range t.smsCallbacks {
-		fmt.Println(callback, out["from"])
-		if callback.number == out["from"] {
-			fmt.Println("callback")
+	for _, callback := range smsCallbacks {
+		if callback.number == out["From"] {
 			callback.resp <- out
 		}
 	}
-	fmt.Println(string(bytes))
+
+	fmt.Println(out)
+}
+func call(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		return
+	}
+	out := make(map[string]string)
+	for name, val := range r.PostForm {
+		out[name] = val[0]
+	}
+	for _, callback := range callCallbacks {
+		if "inbound" == out["Direction"] {
+			if callback.number == out["Caller"] {
+				callback.resp <- out
+			}
+		} else {
+			if callback.number == out["Called"] {
+				callback.resp <- out
+			}
+		}
+	}
+
+	fmt.Println(out)
 }

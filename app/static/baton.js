@@ -73,10 +73,32 @@ function Maestro(){
       self.send("Twilio","recieve-sms",{from:from},callback);
     },
     makeCall:function(to,from,twiml){
+      if(typeof twiml === "object"){
+        twiml = twiml.getText();
+      }
       self.send("Twilio","send-call",{to:to,from:from,twiml:twiml});
     },
     recieveCall:function(from,twiml,callback){
+      if(typeof twiml === "object"){
+        twiml = twiml.getText();
+      }
       self.send("Twilio","recieve-call",{from:from,twiml:twiml},callback);
+    },
+    twiml: function(){
+      var inner = "";
+      return {
+        say:function(text){
+          inner += "<Say>"+text+"</Say>";
+          return this;
+        },
+        play:function(url){
+          inner += "<Play>"+url+"</Play>";
+          return this;
+        },
+        getText:function(){
+          return inner;
+        }
+      };
     },
     process:function(e){
       console.log(e.body);

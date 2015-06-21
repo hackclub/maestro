@@ -2,9 +2,9 @@ package twilio
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,19 +65,35 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 	resp <- out
 	return nil
 }
+
+type callXml struct {
+	RestException twilioError
+}
+type twilioError struct {
+	Code     int
+	Message  string
+	MoreInfo string
+	Status   int
+}
+
 func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) error {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
-	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://6d3e7ae8.ngrok.io/webhooks/Twilio/call"}} //temporary
+	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://e921edd9.ngrok.io/webhooks/Twilio/call"}} //temporary
 	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	str, _ := ioutil.ReadAll(res.Body)
-	fmt.Println(string(str))
+	var out callXml
+	if err := xml.NewDecoder(res.Body).Decode(&out); err != nil {
+		return err
+	}
+	if out.RestException.Code != 0 {
+		return errors.New(out.RestException.Message)
+	}
 	return nil
 }
 func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {

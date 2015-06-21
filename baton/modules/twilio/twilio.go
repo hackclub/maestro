@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -70,10 +71,13 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 	twiml := body["twiml"].(string)
 	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://6d3e7ae8.ngrok.io/webhooks/Twilio/call"}} //temporary
 	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
-	_, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
+	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
 	if err != nil {
 		return err
 	}
+	defer res.Body.Close()
+	str, _ := ioutil.ReadAll(res.Body)
+	fmt.Println(string(str))
 	return nil
 }
 func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
@@ -120,7 +124,7 @@ func sms(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(out, "AccountSid")
 	for _, callback := range smsCallbacks {
-		if callback.number == out["From"] {
+		if callback.number == out["From"] || callback.number == "*" {
 			callback.resp <- out
 		}
 	}

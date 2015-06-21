@@ -95,6 +95,13 @@ function Maestro(){
           inner += "<Play>"+url+"</Play>";
           return this;
         },
+        pause:function(time){
+          if(time === undefined){
+            time = 1;
+          }
+          inner += "<Pause length=\""+time+"\"/>";
+          return this;
+        },
         getText:function(){
           return inner;
         }

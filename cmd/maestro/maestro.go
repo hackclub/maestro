@@ -89,7 +89,6 @@ The options are:
 	go baton.Run()
 	m := http.NewServeMux()
 	m.Handle("/baton/", http.StripPrefix("/baton", baton.Handler()))
-	m.Handle("/webhooks/", http.StripPrefix("/webhooks", baton.WebhookHandler()))
 	m.Handle("/", app.Handler())
 
 	log.Print("Listening on ", *httpAddr)

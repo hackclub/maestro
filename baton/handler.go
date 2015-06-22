@@ -1,6 +1,7 @@
 package baton
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -12,6 +13,11 @@ import (
 func Handler() *mux.Router {
 	m := router.Baton()
 	m.Get(router.BatonConnect).HandlerFunc(serveWs)
+	for name, module := range modules {
+		//PathPrefix needed to make it behave like http.Handle
+		// /webhooks must be included because their documentation lies
+		m.PathPrefix(fmt.Sprintf("/webhooks/%s", name)).Handler(http.StripPrefix(fmt.Sprintf("/webhooks/%s", name), module.Handler()))
+	}
 	return m
 }
 

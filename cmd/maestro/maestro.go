@@ -90,8 +90,6 @@ The options are:
 	m := http.NewServeMux()
 	m.Handle("/baton/", http.StripPrefix("/baton", baton.Handler()))
 	m.Handle("/", app.Handler())
-	// TODO: Add API listener
-	// TODO: Add HTTP listener
 
 	log.Print("Listening on ", *httpAddr)
 	if err := http.ListenAndServe(*httpAddr, m); err != nil {

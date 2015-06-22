@@ -56,6 +56,7 @@ func (n Neutrino) RunCommand(cmd string, body interface{}, resp chan<- interface
 	resp <- out
 	return nil
 }
+
 func (n Neutrino) Handler() *mux.Router {
 	return mux.NewRouter()
 }

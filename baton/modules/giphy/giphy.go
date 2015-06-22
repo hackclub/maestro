@@ -58,6 +58,7 @@ func (g Giphy) RunCommand(cmd string, body interface{}, resp chan<- interface{})
 	resp <- out
 	return nil
 }
+
 func (g Giphy) makeURL(path string, v url.Values) (url.URL, error) {
 	baseURL, _ := url.Parse("http://api.giphy.com/v1/")
 	v.Add("api_key", g.ApiKey)

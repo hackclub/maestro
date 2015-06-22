@@ -25,6 +25,7 @@ func (e Echo) Handler() *mux.Router {
 	m.PathPrefix("/").HandlerFunc(echo)
 	return m
 }
+
 func echo(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(w, r.Body)
 	if err != nil {

@@ -1,44 +1,60 @@
 function Maestro(){
   var self = this;
   this.ws = new WebSocket("ws://localhost:1759/baton/connect")
+  var id = "";
   this.ws.onmessage = function(message){
+    if(!id){
+      id = message.data;
+      return;
+    }
     var data = JSON.parse(message.data);
+    if(callbacks[data.id]){
+      callbacks[data.id](data.body);
+      return;
+    }
     if(self[data.module]){
       self[data.module].process(data);
     }else{
       console.error("Module: " + data.module + " does not exist.");
     }
   };
-  this.send = function(module,call,body){
-    this.ws.send(JSON.stringify({module:module,call:call,body:body}));
+  var callbacks = {};
+  var counter = 0;
+  this.send = function(module,call,body,callback){
+    var mID = id+"-"+counter;
+    if(callback){
+      callbacks[mID] = callback;
+    }
+    this.ws.send(JSON.stringify({module:module,call:call,id:mID,body:body}));
+    counter++;
   };
   this.Echo = {
-    echo:function(e){
-      self.send("Echo","echo",e);
+    echo:function(e,callback){
+      self.send("Echo","echo",e,callback);
     },
     process:function(e){
       console.log(e.body);
     }
   };
   this.Giphy = {
-    search:function(e){
-      self.send("Giphy","search",{q:e});
+    search:function(e,c){
+      self.send("Giphy","search",{q:e},c);
     },
-    getById:function(id){
+    getById:function(id,c){
       if(id instanceof Array){
-        self.send("Giphy","getbyids",{ids: id.join(',')});
+        self.send("Giphy","getbyids",{ids: id.join(',')},c);
       }else{
-        self.send("Giphy","getbyid", {id:id});
+        self.send("Giphy","getbyid", {id:id},c);
       }
     },
-    translate:function(e){
-      self.send("Giphy","translate",{term:e});
+    translate:function(e,c){
+      self.send("Giphy","translate",{term:e},c);
     },
-    random:function(e){
-      self.send("Giphy","random",{tags:e});
+    random:function(e,c){
+      self.send("Giphy","random",{tags:e},c);
     },
-    trending:function(){
-      self.send("Giphy","trending","");
+    trending:function(c){
+      self.send("Giphy","trending","",c);
     },
     process:function(e){
       console.log(e.body);

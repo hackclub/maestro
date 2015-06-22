@@ -9,6 +9,7 @@ import (
 type command struct {
 	Module string      `json:"module"`
 	Call   string      `json:"call"`
+	ID     string      `json:"id"`
 	Body   interface{} `json:"body"`
 }
 
@@ -68,7 +69,7 @@ func processMessage(message msg) {
 				close(resp)
 				break
 			}
-			bytes, err := json.Marshal(command{message.cmd.Module, message.cmd.Call, r}) //add in Module and Call info for client
+			bytes, err := json.Marshal(command{message.cmd.Module, message.cmd.Call, message.cmd.ID, r}) //add in Module and Call info for client
 			if err != nil {
 				log.Println("Error Marshaling")
 				log.Println(err)

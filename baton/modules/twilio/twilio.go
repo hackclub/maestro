@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -53,12 +54,14 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.UserId), form)
 	if err != nil {
+		log.Println("Twilio: Error in POST to /Messages.json")
 		return err
 	}
 	defer res.Body.Close()
 
 	var out map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		log.Println("Twilio: Error decoding body as JSON")
 		return err
 	}
 	delete(out, "account_sid")
@@ -69,6 +72,7 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 type callXml struct {
 	RestException twilioError
 }
+
 type twilioError struct {
 	Code     int
 	Message  string
@@ -84,18 +88,22 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
 	if err != nil {
+		log.Println("Twilio: Error in POST to /Calls")
 		return err
 	}
 	defer res.Body.Close()
 	var out callXml
 	if err := xml.NewDecoder(res.Body).Decode(&out); err != nil {
+		log.Println("Twilio: Error decoding body as XML")
 		return err
 	}
 	if out.RestException.Code != 0 {
+		log.Println("Twilio: Error from Twilio server")
 		return errors.New(out.RestException.Message)
 	}
 	return nil
 }
+
 func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
 	from := body["from"].(string)
 	smsCallbacks = append(smsCallbacks, callback{from, resp, ""})
@@ -108,6 +116,7 @@ func (t Twilio) recieveCall(body map[string]interface{}, resp chan<- interface{}
 	callCallbacks = append(callCallbacks, callback{from, resp, twiml})
 	return nil
 }
+
 func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -129,10 +138,12 @@ func (t Twilio) Handler() *mux.Router {
 	m.Path("/call").HandlerFunc(call)
 	return m
 }
+
 func sms(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		fmt.Println(err)
+		log.Println("Giphy: Error parsing form")
+		log.Println(err)
 	}
 	out := make(map[string]string)
 	for name, val := range r.PostForm {
@@ -144,13 +155,13 @@ func sms(w http.ResponseWriter, r *http.Request) {
 			callback.resp <- out
 		}
 	}
-
-	fmt.Println(out)
 }
+
 func call(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		return
+		log.Println("Giphy: Error parsing form")
+		log.Println(err)
 	}
 	out := make(map[string]string)
 	for name, val := range r.PostForm {
@@ -174,6 +185,4 @@ func call(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	fmt.Println(callCallbacks)
 }

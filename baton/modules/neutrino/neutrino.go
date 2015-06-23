@@ -39,19 +39,18 @@ func (n Neutrino) RunCommand(cmd string, body interface{}, resp chan<- interface
 	v.Add("api-key", n.ApiKey)
 	v.Add("ip", "162.209.104.195")
 	url := "https://neutrinoapi.com/" + cmd
-	log.Println(url, newBody)
 
 	data, err := http.PostForm(url, v)
 	if err != nil {
-		log.Fatalf("could not fetch: %v", err)
-		return nil
+		log.Println("Neutrino: Could not POST data")
+		return err
 	}
 	defer data.Body.Close()
 
 	var out interface{}
 	if err := json.NewDecoder(data.Body).Decode(&out); err != nil {
-		log.Println(err)
-		return nil
+		log.Println("Neutrino: Error decoding body as JSON")
+		return err
 	}
 	resp <- out
 	return nil

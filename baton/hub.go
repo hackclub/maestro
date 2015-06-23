@@ -43,11 +43,11 @@ func (h hub) run() {
 		case rawMsg := <-h.receive:
 			var cmd command
 			if err := json.Unmarshal(rawMsg.data, &cmd); err != nil {
-				fmt.Println("nu")
+				log.Println("Error unmarshaling message into a command")
 				log.Println(err)
 				break
 			}
-			fmt.Println(cmd)
+			log.Println("cmd:", cmd)
 			msg := msg{rawMsg.conn, cmd}
 			processMessage(msg)
 		}
@@ -58,7 +58,7 @@ func processMessage(message msg) {
 	resp := make(chan interface{})
 	module, ok := modules[message.cmd.Module]
 	if !ok {
-		fmt.Println(message.cmd.Module, "not in", modules)
+		log.Println(message.cmd.Module, "not in modules")
 		return
 	}
 
@@ -71,7 +71,7 @@ func processMessage(message msg) {
 			}
 			bytes, err := json.Marshal(command{message.cmd.Module, message.cmd.Call, message.cmd.ID, r}) //add in Module and Call info for client
 			if err != nil {
-				log.Println("Error Marshaling")
+				log.Println("Error marshaling command into JSON")
 				log.Println(err)
 				break
 			}
@@ -80,6 +80,7 @@ func processMessage(message msg) {
 	}()
 	go func() {
 		if err := module.RunCommand(message.cmd.Call, message.cmd.Body, resp); err != nil {
+			log.Println("Error inside RunCommand")
 			fmt.Println(err)
 		}
 	}()

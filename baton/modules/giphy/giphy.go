@@ -39,21 +39,22 @@ func (g Giphy) RunCommand(cmd string, body interface{}, resp chan<- interface{})
 	default:
 		return errors.New("unknown command: " + cmd)
 	}
-	log.Println(u.String())
 	if err != nil {
+		log.Println("Giphy: error making URL")
 		return err
 	}
+	log.Println("Giphy: URL to be requested", u.String())
 	res, err := http.Get(u.String())
 	if err != nil {
+		log.Println("Giphy: Error in GET request")
 		return err
 	}
 	defer res.Body.Close()
 
 	var out interface{}
 	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
-		log.Println("nu")
-		log.Println(err)
-		return nil
+		log.Println("Giphy: Error decoding body as JSON")
+		return err
 	}
 	resp <- out
 	return nil

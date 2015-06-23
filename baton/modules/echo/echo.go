@@ -2,8 +2,8 @@ package echo
 
 import (
 	"errors"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -29,6 +29,7 @@ func (e Echo) Handler() *mux.Router {
 func echo(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(w, r.Body)
 	if err != nil {
-		fmt.Println(err)
+		log.Println("Echo:", "Error copying request body")
+		log.Println("Echo:", err)
 	}
 }

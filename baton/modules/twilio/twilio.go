@@ -2,7 +2,6 @@ package twilio
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"net/http"
@@ -66,32 +65,24 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 	return nil
 }
 
-type callXml struct {
-	RestException twilioError
-}
-type twilioError struct {
-	Code     int
-	Message  string
-	MoreInfo string
-	Status   int
-}
-
 func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) error {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
 	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://524b95fe.ngrok.io/baton/webhooks/Twilio/call"}} //temporary
-	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
+	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls.json", t.UserId), form)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	var out callXml
-	if err := xml.NewDecoder(res.Body).Decode(&out); err != nil {
+
+	var out map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
 		return err
 	}
-	if out.RestException.Code != 0 {
-		return errors.New(out.RestException.Message)
+	delete(out, "account_sid")
+	if message, ok := out["Message"]; ok {
+		return errors.New(message.(string))
 	}
 	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
 	return nil

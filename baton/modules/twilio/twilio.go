@@ -56,12 +56,12 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 	}
 	defer res.Body.Close()
 
-	var out map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+	var jsonResponse map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
 		return err
 	}
-	delete(out, "account_sid")
-	resp <- out
+	delete(jsonResponse, "account_sid")
+	resp <- jsonResponse
 	return nil
 }
 
@@ -76,12 +76,12 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 	}
 	defer res.Body.Close()
 
-	var out map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+	var jsonResponse map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
 		return err
 	}
-	delete(out, "account_sid")
-	if message, ok := out["Message"]; ok {
+	delete(jsonResponse, "account_sid")
+	if message, ok := jsonResponse["Message"]; ok {
 		return errors.New(message.(string))
 	}
 	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
@@ -123,41 +123,41 @@ func sms(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		fmt.Println(err)
 	}
-	out := make(map[string]string)
+	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
-		out[name] = val[0]
+		jsonResponse[name] = val[0]
 	}
-	delete(out, "AccountSid")
+	delete(jsonResponse, "AccountSid")
 	for _, callback := range smsCallbacks {
-		if callback.number == out["From"] || callback.number == "*" {
-			callback.resp <- out
+		if callback.number == jsonResponse["From"] || callback.number == "*" {
+			callback.resp <- jsonResponse
 		}
 	}
 
-	fmt.Println(out)
+	fmt.Println(jsonResponse)
 }
 func call(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		return
 	}
-	out := make(map[string]string)
+	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
-		out[name] = val[0]
+		jsonResponse[name] = val[0]
 	}
-	delete(out, "AccountSid")
+	delete(jsonResponse, "AccountSid")
 	for i, callback := range callCallbacks {
-		if "inbound" == out["Direction"] {
-			if callback.number == out["Caller"] {
+		if "inbound" == jsonResponse["Direction"] {
+			if callback.number == jsonResponse["Caller"] {
 				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-				callback.resp <- out
+				callback.resp <- jsonResponse
 				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
 				break
 			}
 		} else {
-			if callback.number == out["Called"] {
+			if callback.number == jsonResponse["Called"] {
 				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-				callback.resp <- out
+				callback.resp <- jsonResponse
 				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
 				break
 			}

@@ -80,8 +80,7 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
-	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://e921edd9.ngrok.io/webhooks/Twilio/call"}} //temporary
-	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
+	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://524b95fe.ngrok.io/baton/webhooks/Twilio/call"}} //temporary
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
 	if err != nil {
 		return err
@@ -94,6 +93,7 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 	if out.RestException.Code != 0 {
 		return errors.New(out.RestException.Message)
 	}
+	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
 	return nil
 }
 func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
@@ -124,14 +124,12 @@ func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 
 func (t Twilio) Handler() *mux.Router {
 	m := mux.NewRouter()
-
 	m.Path("/sms").HandlerFunc(sms)
 	m.Path("/call").HandlerFunc(call)
 	return m
 }
 func sms(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		fmt.Println(err)
 	}
 	out := make(map[string]string)

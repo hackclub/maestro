@@ -37,8 +37,14 @@ function Maestro(){
     }
   };
   this.Giphy = {
-    search:function(e,c){
+    find:function(e,c){
       self.send("Giphy","search",{q:e},c);
+    },
+    findFirst:function(e,c){
+      self.send("Giphy","search",{q:e},function(response){
+        var tmp = response.data[0];
+        c({id:tmp.id,url:tmp.images.original.url});
+      });
     },
     getById:function(id,c){
       if(id instanceof Array){
@@ -69,13 +75,28 @@ function Maestro(){
     sendSms:function(to,from,body){
       self.send("Twilio","send-sms",{to:to,from:from,body:body});
     },
+    sendMms:function(to,from,url){
+      self.send("Twilio","send-mms",{to:to,from:from,url:url});
+    },
     recieveSms:function(from,callback){
       self.send("Twilio","recieve-sms",{from:from},callback);
     },
-    makeCall:function(to,from,twiml){
+    call:function(to,from,twiml){
       if(typeof twiml === "object"){
         twiml = twiml.getText();
       }
+      self.send("Twilio","send-call",{to:to,from:from,twiml:twiml});
+    },
+    callAndPlay:function(to,from,url){
+      var twiml = this.twiml();
+      twiml.pause(2);
+      twiml.play(url);
+      self.send("Twilio","send-call",{to:to,from:from,twiml:twiml});
+    },
+    callAndSay:function(to,from,text){
+      var twiml = this.twiml();
+      twiml.pause(2);
+      twiml.say(text);
       self.send("Twilio","send-call",{to:to,from:from,twiml:twiml});
     },
     recieveCall:function(from,twiml,callback){

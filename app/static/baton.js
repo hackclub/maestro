@@ -99,11 +99,11 @@ function Maestro(){
       twiml.say(text);
       self.send("Twilio","send-call",{to:to,from:from,twiml:twiml.getText()});
     },
-    recieveCall:function(from,twiml,callback){
+    recieveCall:function(to,twiml,callback){
       if(typeof twiml === "object"){
         twiml = twiml.getText();
       }
-      self.send("Twilio","recieve-call",{from:from,twiml:twiml},callback);
+      self.send("Twilio","recieve-call",{to:to,twiml:twiml},callback);
     },
     twiml: function(){
       var inner = "";

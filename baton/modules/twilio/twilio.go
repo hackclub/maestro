@@ -22,7 +22,8 @@ var URL = os.Getenv("host-location")
 
 var (
 	smsCallbacks  = make([]callback, 0)
-	callCallbacks = make([]callback, 0)
+	outboundCalls = make([]callback, 0)
+	inboundCalls  = make(map[string]callback)
 )
 
 type callback struct {
@@ -95,9 +96,9 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
-	form := url.Values{"To": {to}, "From": {from}, "Url": {URL + "/baton/webhooks/Twilio/call"}}
+	form := url.Values{"To": {to}, "From": {from}, "Url": {URL + "/baton/webhooks/Twilio/call/outbound"}}
 	log.Println(URL + "/baton/webhooks/Twilio/call")
-	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
+	outboundCalls = append(outboundCalls, callback{to, resp, twiml})
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
 	if err != nil {
 		log.Println("Twilio: Error in POST to /Calls")
@@ -123,9 +124,9 @@ func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{})
 }
 
 func (t Twilio) recieveCall(body map[string]interface{}, resp chan<- interface{}) error {
-	from := body["from"].(string)
+	to := body["to"].(string)
 	twiml := body["twiml"].(string)
-	callCallbacks = append(callCallbacks, callback{from, resp, twiml})
+	inboundCalls[to] = callback{to, resp, twiml}
 	return nil
 }
 
@@ -147,14 +148,15 @@ func (t Twilio) Handler() *mux.Router {
 	m := mux.NewRouter()
 
 	m.Path("/sms").HandlerFunc(sms)
-	m.Path("/call").HandlerFunc(call)
+	m.Path("/call/inbound").HandlerFunc(inboundCall)
+	m.Path("/call/outbound").HandlerFunc(outboundCall)
 	return m
 }
 
 func sms(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		log.Println("Giphy: Error parsing form")
+		log.Println("Twilio: Error parsing form")
 		log.Println(err)
 	}
 	out := make(map[string]string)
@@ -169,10 +171,10 @@ func sms(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func call(w http.ResponseWriter, r *http.Request) {
+func outboundCall(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		log.Println("Giphy: Error parsing form")
+		log.Println("Twilio: Error parsing form")
 		log.Println(err)
 	}
 	out := make(map[string]string)
@@ -180,21 +182,31 @@ func call(w http.ResponseWriter, r *http.Request) {
 		out[name] = val[0]
 	}
 	delete(out, "AccountSid")
-	for i, callback := range callCallbacks {
-		if "inbound" == out["Direction"] {
-			if callback.number == out["Caller"] {
-				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-				callback.resp <- out
-				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
-				break
-			}
-		} else {
-			if callback.number == out["Called"] {
-				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-				callback.resp <- out
-				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
-				break
-			}
+	for i, callback := range outboundCalls {
+		if callback.number == out["Called"] {
+			fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
+			callback.resp <- out
+			outboundCalls = append(outboundCalls[:i], outboundCalls[i+1:]...)
+			break
 		}
 	}
+}
+
+func inboundCall(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		log.Println("Twilio: Error parsing form")
+		log.Println(err)
+	}
+
+	out := make(map[string]string)
+	for name, val := range r.PostForm {
+		out[name] = val[0]
+	}
+	delete(out, "AccountSid")
+	if callback, ok := inboundCalls[out["Called"]]; ok {
+		fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
+		callback.resp <- out
+	}
+	fmt.Println(inboundCalls, out["Caller"])
 }

@@ -78,8 +78,8 @@ function Maestro(){
     sendMms:function(to,from,url){
       self.send("Twilio","send-mms",{to:to,from:from,url:url});
     },
-    recieveSms:function(from,callback){
-      self.send("Twilio","recieve-sms",{from:from},callback);
+    recieveSms:function(to,callback){
+      self.send("Twilio","recieve-sms",{to:to},callback);
     },
     call:function(to,from,twiml){
       if(typeof twiml === "object"){

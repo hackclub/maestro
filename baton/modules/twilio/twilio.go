@@ -117,7 +117,7 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 }
 
 func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
-	from := body["from"].(string)
+	from := body["to"].(string)
 	smsCallbacks = append(smsCallbacks, callback{from, resp, ""})
 	return nil
 }
@@ -163,7 +163,7 @@ func sms(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(out, "AccountSid")
 	for _, callback := range smsCallbacks {
-		if callback.number == out["From"] || callback.number == "*" {
+		if callback.number == out["To"] {
 			callback.resp <- out
 		}
 	}

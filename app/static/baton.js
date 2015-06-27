@@ -91,13 +91,13 @@ function Maestro(){
       var twiml = this.twiml();
       twiml.pause(2);
       twiml.play(url);
-      self.send("Twilio","send-call",{to:to,from:from,twiml:twiml});
+      self.send("Twilio","send-call",{to:to,from:from,twiml:twiml.getText()});
     },
     callAndSay:function(to,from,text){
       var twiml = this.twiml();
       twiml.pause(2);
       twiml.say(text);
-      self.send("Twilio","send-call",{to:to,from:from,twiml:twiml});
+      self.send("Twilio","send-call",{to:to,from:from,twiml:twiml.getText()});
     },
     recieveCall:function(from,twiml,callback){
       if(typeof twiml === "object"){

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -16,6 +17,8 @@ import (
 type Twilio struct {
 	UserId, ApiKey string
 }
+
+var URL = os.Getenv("host-location")
 
 var (
 	smsCallbacks  = make([]callback, 0)
@@ -35,6 +38,8 @@ func (t Twilio) RunCommand(cmd string, body interface{}, resp chan<- interface{}
 	switch cmd {
 	case "send-sms":
 		return t.sendSMS(newBody, resp)
+	case "send-mms":
+		return t.sendSMS(newBody, resp)
 	case "recieve-sms":
 		return t.recieveSMS(newBody, resp)
 	case "send-call":
@@ -49,8 +54,14 @@ func (t Twilio) RunCommand(cmd string, body interface{}, resp chan<- interface{}
 func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) error {
 	to := body["to"].(string)
 	from := body["from"].(string)
-	message := body["body"].(string)
-	form := url.Values{"To": {to}, "From": {from}, "Body": {message}}
+	form := url.Values{"To": {to}, "From": {from}}
+
+	if message, ok := body["body"]; ok {
+		form.Add("Body", message.(string))
+	}
+	if url, ok := body["url"]; ok {
+		form.Add("MediaUrl", url.(string))
+	}
 
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.UserId), form)
 	if err != nil {
@@ -84,7 +95,8 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
-	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://e921edd9.ngrok.io/webhooks/Twilio/call"}} //temporary
+	form := url.Values{"To": {to}, "From": {from}, "Url": {URL + "/baton/webhooks/Twilio/call"}}
+	log.Println(URL + "/baton/webhooks/Twilio/call")
 	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
 	if err != nil {

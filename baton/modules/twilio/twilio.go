@@ -2,7 +2,6 @@ package twilio
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"log"
@@ -71,49 +70,40 @@ func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) er
 	}
 	defer res.Body.Close()
 
-	var out map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+	var jsonResponse map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
 		log.Println("Twilio: Error decoding body as JSON")
 		return err
 	}
-	delete(out, "account_sid")
-	resp <- out
+	delete(jsonResponse, "account_sid")
+	resp <- jsonResponse
 	return nil
-}
-
-type callXml struct {
-	RestException twilioError
-}
-
-type twilioError struct {
-	Code     int
-	Message  string
-	MoreInfo string
-	Status   int
 }
 
 func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) error {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
+
 	form := url.Values{"To": {to}, "From": {from}, "Url": {URL + "/baton/webhooks/Twilio/call/outbound"}}
-	log.Println(URL + "/baton/webhooks/Twilio/call")
-	outboundCalls = append(outboundCalls, callback{to, resp, twiml})
-	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls", t.UserId), form)
+	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls.json", t.UserId), form)
 	if err != nil {
 		log.Println("Twilio: Error in POST to /Calls")
 		return err
 	}
 	defer res.Body.Close()
-	var out callXml
-	if err := xml.NewDecoder(res.Body).Decode(&out); err != nil {
-		log.Println("Twilio: Error decoding body as XML")
+
+	var jsonResponse map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
+		log.Println("Twilio: Error decoding body as JSON")
 		return err
 	}
-	if out.RestException.Code != 0 {
+	delete(jsonResponse, "account_sid")
+	if message, ok := jsonResponse["Message"]; ok {
 		log.Println("Twilio: Error from Twilio server")
-		return errors.New(out.RestException.Message)
+		return errors.New(message.(string))
 	}
+	outboundCalls = append(outboundCalls, callback{to, resp, twiml})
 	return nil
 }
 
@@ -146,7 +136,6 @@ func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 
 func (t Twilio) Handler() *mux.Router {
 	m := mux.NewRouter()
-
 	m.Path("/sms").HandlerFunc(sms)
 	m.Path("/call/inbound").HandlerFunc(inboundCall)
 	m.Path("/call/outbound").HandlerFunc(outboundCall)
@@ -154,19 +143,18 @@ func (t Twilio) Handler() *mux.Router {
 }
 
 func sms(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		log.Println("Twilio: Error parsing form")
-		log.Println(err)
+		fmt.Println(err)
 	}
-	out := make(map[string]string)
+	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
-		out[name] = val[0]
+		jsonResponse[name] = val[0]
 	}
-	delete(out, "AccountSid")
+	delete(jsonResponse, "AccountSid")
 	for _, callback := range smsCallbacks {
-		if callback.number == out["To"] {
-			callback.resp <- out
+		if callback.number == jsonResponse["To"] {
+			callback.resp <- jsonResponse
 		}
 	}
 }
@@ -177,15 +165,15 @@ func outboundCall(w http.ResponseWriter, r *http.Request) {
 		log.Println("Twilio: Error parsing form")
 		log.Println(err)
 	}
-	out := make(map[string]string)
+	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
-		out[name] = val[0]
+		jsonResponse[name] = val[0]
 	}
-	delete(out, "AccountSid")
+	delete(jsonResponse, "AccountSid")
 	for i, callback := range outboundCalls {
-		if callback.number == out["Called"] {
+		if callback.number == jsonResponse["Called"] {
 			fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-			callback.resp <- out
+			callback.resp <- jsonResponse
 			outboundCalls = append(outboundCalls[:i], outboundCalls[i+1:]...)
 			break
 		}

@@ -104,7 +104,8 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 		log.Println("Twilio: Error from Twilio server")
 		return errors.New(message.(string))
 	}
-	outboundCalls = append(outboundCalls, callback{to, resp, twiml})
+
+	outboundCalls = append(outboundCalls, callback{jsonResponse["to"].(string), resp, twiml})
 	return nil
 }
 
@@ -201,7 +202,6 @@ func inboundCall(w http.ResponseWriter, r *http.Request) {
 			delete(inboundCalls, jsonResponse["Called"])
 		}
 	}
-	fmt.Println(inboundCalls, jsonResponse["Caller"])
 }
 
 //TODO: better system for safety

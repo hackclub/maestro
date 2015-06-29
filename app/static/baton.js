@@ -37,7 +37,7 @@ function Maestro(){
     }
   };
   this.Giphy = {
-    find:function(e,c){
+    search:function(e,c){
       self.send("Giphy","search",{q:e},c);
     },
     findFirst:function(e,c){

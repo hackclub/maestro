@@ -66,7 +66,6 @@ func processMessage(message msg) {
 		for {
 			r, ok := <-resp
 			if !ok {
-				close(resp)
 				break
 			}
 			bytes, err := json.Marshal(command{message.cmd.Module, message.cmd.Call, message.cmd.ID, r}) //add in Module and Call info for client
@@ -75,8 +74,11 @@ func processMessage(message msg) {
 				log.Println(err)
 				break
 			}
-			message.conn.send <- bytes
+			if !safeSend(message.conn.send, bytes) {
+				break
+			}
 		}
+		close(resp)
 	}()
 	go func() {
 		if err := module.RunCommand(message.cmd.Call, message.cmd.Body, resp); err != nil {
@@ -95,4 +97,11 @@ var h = hub{
 
 func Run() {
 	h.run()
+}
+
+//TODO: better system for safety
+func safeSend(resp chan<- []byte, data []byte) bool {
+	defer func() { recover() }()
+	resp <- data
+	return true
 }

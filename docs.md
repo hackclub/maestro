@@ -80,7 +80,7 @@ maestro.Twilio.sendSms("human-number","twilio-number","message body");
 ```
 ###sendMms
 ```
-maestro.Twilio.sendMs("human-number","twilio-number","http://www.vetprofessionals.com/catprofessional/images/home-cat.jpg");
+maestro.Twilio.sendMms("human-number","twilio-number","http://www.vetprofessionals.com/catprofessional/images/home-cat.jpg");
 ```
 ###recieveSms
 ```

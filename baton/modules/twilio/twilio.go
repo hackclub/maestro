@@ -17,7 +17,7 @@ type Twilio struct {
 	UserId, ApiKey string
 }
 
-var URL = os.Getenv("host-location")
+var URL = os.Getenv("HOSTLOCATION")
 
 var (
 	smsCallbacks  = make([]callback, 0)
@@ -99,7 +99,8 @@ func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) e
 		return err
 	}
 	delete(jsonResponse, "account_sid")
-	if message, ok := jsonResponse["Message"]; ok {
+	resp <- jsonResponse
+	if message, ok := jsonResponse["message"]; ok {
 		log.Println("Twilio: Error from Twilio server")
 		return errors.New(message.(string))
 	}
@@ -152,9 +153,11 @@ func sms(w http.ResponseWriter, r *http.Request) {
 		jsonResponse[name] = val[0]
 	}
 	delete(jsonResponse, "AccountSid")
-	for _, callback := range smsCallbacks {
+	for i, callback := range smsCallbacks {
 		if callback.number == jsonResponse["To"] {
-			callback.resp <- jsonResponse
+			if !safeSend(callback.resp, jsonResponse) {
+				smsCallbacks = append(smsCallbacks[:i], smsCallbacks[i+1:]...)
+			}
 		}
 	}
 }
@@ -173,7 +176,7 @@ func outboundCall(w http.ResponseWriter, r *http.Request) {
 	for i, callback := range outboundCalls {
 		if callback.number == jsonResponse["Called"] {
 			fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-			callback.resp <- jsonResponse
+			safeSend(callback.resp, jsonResponse)
 			outboundCalls = append(outboundCalls[:i], outboundCalls[i+1:]...)
 			break
 		}
@@ -187,14 +190,23 @@ func inboundCall(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
-	out := make(map[string]string)
+	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
-		out[name] = val[0]
+		jsonResponse[name] = val[0]
 	}
-	delete(out, "AccountSid")
-	if callback, ok := inboundCalls[out["Called"]]; ok {
+	delete(jsonResponse, "AccountSid")
+	if callback, ok := inboundCalls[jsonResponse["Called"]]; ok {
 		fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-		callback.resp <- out
+		if !safeSend(callback.resp, jsonResponse) {
+			delete(inboundCalls, jsonResponse["Called"])
+		}
 	}
-	fmt.Println(inboundCalls, out["Caller"])
+	fmt.Println(inboundCalls, jsonResponse["Caller"])
+}
+
+//TODO: better system for safety
+func safeSend(resp chan<- interface{}, data interface{}) bool {
+	defer func() { recover() }()
+	resp <- data
+	return true
 }

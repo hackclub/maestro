@@ -2,22 +2,33 @@ package neutrino
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/gorilla/mux"
+	"github.com/hackedu/maestro/baton/commands"
 )
 
 type Neutrino struct {
 	UserId, ApiKey string
 }
 
-func (n Neutrino) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
+var resp chan<- commands.Command
+
+func (n Neutrino) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+	resp = resp
+	go func() {
+		for {
+			go n.RunCommand(<-cmd)
+		}
+	}()
+}
+
+func (n Neutrino) RunCommand(cmd commands.Command) {
 	v := url.Values{}
-	newBody := body.(map[string]interface{})
-	switch cmd {
+	newBody := cmd.Body.(map[string]interface{})
+	switch cmd.Call {
 	case "geocode-address":
 		v.Add("address", newBody["address"].(string))
 	case "geocode-reverse":
@@ -33,27 +44,26 @@ func (n Neutrino) RunCommand(cmd string, body interface{}, resp chan<- interface
 		v.Add("from-type", newBody["from-type"].(string))
 		v.Add("to-type", newBody["to-type"].(string))
 	default:
-		return errors.New("unknown command: " + cmd)
+		log.Println("unknown command: " + cmd.Call)
 	}
 	v.Add("user-id", n.UserId)
 	v.Add("api-key", n.ApiKey)
 	v.Add("ip", "162.209.104.195")
-	url := "https://neutrinoapi.com/" + cmd
+	url := "https://neutrinoapi.com/" + cmd.Call
 
 	data, err := http.PostForm(url, v)
 	if err != nil {
 		log.Println("Neutrino: Could not POST data")
-		return err
+		log.Println(err)
 	}
 	defer data.Body.Close()
 
 	var out interface{}
 	if err := json.NewDecoder(data.Body).Decode(&out); err != nil {
 		log.Println("Neutrino: Error decoding body as JSON")
-		return err
+		log.Println(err)
 	}
-	resp <- out
-	return nil
+	resp <- commands.Command{"Neutrino", cmd.Call, cmd.ID, out}
 }
 
 func (n Neutrino) Handler() *mux.Router {

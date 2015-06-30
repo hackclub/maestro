@@ -2,106 +2,77 @@ package baton
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
-)
 
-type command struct {
-	Module string      `json:"module"`
-	Call   string      `json:"call"`
-	ID     string      `json:"id"`
-	Body   interface{} `json:"body"`
-}
+	"github.com/hackedu/maestro/baton/commands"
+)
 
 type rawMsg struct {
 	conn conn
 	data []byte
 }
 
-type msg struct {
-	conn conn
-	cmd  command
-}
-
 type hub struct {
-	conns      map[conn]struct{}
+	conns      map[conn][]string
+	ids        map[string]conn
 	register   chan conn
 	unregister chan conn
 	receive    chan rawMsg
+	send       chan commands.Command
 }
 
 func (h hub) run() {
 	for {
 		select {
 		case c := <-h.register:
-			h.conns[c] = struct{}{}
+			h.conns[c] = make([]string, 0)
 		case c := <-h.unregister:
-			if _, ok := h.conns[c]; ok {
+			if ids, ok := h.conns[c]; ok {
 				delete(h.conns, c)
+				for _, id := range ids {
+					delete(h.ids, id)
+				}
 				close(c.send)
 			}
 		case rawMsg := <-h.receive:
-			var cmd command
+			var cmd commands.Command
 			if err := json.Unmarshal(rawMsg.data, &cmd); err != nil {
 				log.Println("Error unmarshaling message into a command")
 				log.Println(err)
 				break
 			}
 			log.Println("cmd:", cmd)
-			msg := msg{rawMsg.conn, cmd}
-			processMessage(msg)
-		}
-	}
-}
-
-func processMessage(message msg) {
-	resp := make(chan interface{})
-	module, ok := modules[message.cmd.Module]
-	if !ok {
-		log.Println(message.cmd.Module, "not in modules")
-		return
-	}
-
-	go func() {
-		for {
-			r, ok := <-resp
+			module, ok := moduleChannels[cmd.Module]
 			if !ok {
+				log.Println(cmd.Module, "not in modules")
 				break
 			}
-			bytes, err := json.Marshal(command{message.cmd.Module, message.cmd.Call, message.cmd.ID, r}) //add in Module and Call info for client
+			h.conns[rawMsg.conn] = append(h.conns[rawMsg.conn], cmd.ID)
+			h.ids[cmd.ID] = rawMsg.conn
+			module <- cmd
+		case outMsg := <-h.send:
+			c, _ := h.ids[outMsg.ID]
+			log.Println(outMsg)
+			bytes, err := json.Marshal(outMsg)
 			if err != nil {
-				log.Println("Error marshaling command into JSON")
+				log.Println("Error marshaling commands.Command into JSON")
 				log.Println(err)
 				break
 			}
-			if !safeSend(message.conn.send, bytes) {
-				break
-			}
+			c.send <- bytes
 		}
-		close(resp)
-	}()
-	go func() {
-		if err := module.RunCommand(message.cmd.Call, message.cmd.Body, resp); err != nil {
-			log.Println("Error inside RunCommand")
-			fmt.Println(err)
-		}
-	}()
+	}
 }
 
 var h = hub{
-	conns:      make(map[conn]struct{}),
+	conns:      make(map[conn][]string),
+	ids:        make(map[string]conn),
 	register:   make(chan conn),
 	unregister: make(chan conn),
 	receive:    make(chan rawMsg),
+	send:       make(chan commands.Command),
 }
 
 func Run() {
 	h.run()
-}
-
-//TODO: better system for safety
-func safeSend(resp chan<- []byte, data []byte) bool {
-	defer func() { recover() }()
-	resp <- data
-	return true
 }

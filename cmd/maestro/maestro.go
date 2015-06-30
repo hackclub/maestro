@@ -86,6 +86,7 @@ The options are:
 		fs.Usage()
 	}
 
+	baton.InitModules()
 	go baton.Run()
 	m := http.NewServeMux()
 	m.Handle("/baton/", http.StripPrefix("/baton", baton.Handler()))

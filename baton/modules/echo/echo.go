@@ -1,23 +1,30 @@
 package echo
 
 import (
-	"errors"
 	"io"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/hackedu/maestro/baton/commands"
 )
 
 type Echo struct {
 }
 
-func (e Echo) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
-	if cmd != "echo" {
-		return errors.New("unknown command: " + cmd)
-	}
-	resp <- body
-	return nil
+var resp chan<- commands.Command
+
+func (e Echo) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+	resp = resp
+	go func() {
+		for {
+			tmp := <-cmd
+			if tmp.Call != "echo" {
+				log.Println("unknown command: " + tmp.Call)
+			}
+			resp <- tmp
+		}
+	}()
 }
 
 func (e Echo) Handler() *mux.Router {

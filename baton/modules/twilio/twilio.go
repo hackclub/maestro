@@ -58,7 +58,7 @@ func (t Twilio) RunCommand(cmd commands.Command) {
 	case "recieve-call":
 		t.recieveCall(newBody, cmd.ID)
 	default:
-		log.Println("unknown command: " + cmd.Call)
+		log.Println("Twilio: unknown command", cmd.Call)
 	}
 }
 
@@ -77,14 +77,14 @@ func (t Twilio) sendSMS(body map[string]interface{}, id string) {
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.UserId), form)
 	if err != nil {
 		log.Println("Twilio: Error in POST to /Messages.json")
-		log.Println(err)
+		log.Println("Twilio:", err)
 	}
 	defer res.Body.Close()
 
 	var jsonResponse map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
 		log.Println("Twilio: Error decoding body as JSON")
-		log.Println(err)
+		log.Println("Twilio:", err)
 	}
 	delete(jsonResponse, "account_sid")
 	send(id, "send-sms", jsonResponse)
@@ -153,15 +153,18 @@ func (t Twilio) Handler() *mux.Router {
 func sms(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Println("Twilio: Error parsing form")
-		fmt.Println(err)
+		fmt.Println("Twilio:", err)
 	}
 	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
 		jsonResponse[name] = val[0]
 	}
 	delete(jsonResponse, "AccountSid")
+	log.Println("Twilio: SMS recieved on number", jsonResponse["To"])
+	log.Println("Twilio: Callbacks", smsCallbacks)
 	for i, callback := range smsCallbacks {
 		if callback.number == jsonResponse["To"] {
+			log.Println("Twilio: Callback sent to", callback.id)
 			if !send(callback.id, "recieve-sms", jsonResponse) {
 				smsCallbacks = append(smsCallbacks[:i], smsCallbacks[i+1:]...)
 			}
@@ -173,7 +176,7 @@ func outboundCall(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		log.Println("Twilio: Error parsing form")
-		log.Println(err)
+		log.Println("Twilio", err)
 	}
 	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
@@ -194,7 +197,7 @@ func inboundCall(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		log.Println("Twilio: Error parsing form")
-		log.Println(err)
+		log.Println("Twilio:", err)
 	}
 
 	jsonResponse := make(map[string]string)

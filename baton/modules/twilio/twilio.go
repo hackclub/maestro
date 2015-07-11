@@ -153,7 +153,7 @@ func (t Twilio) Handler() *mux.Router {
 func sms(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Println("Twilio: Error parsing form")
-		fmt.Println("Twilio:", err)
+		log.Println("Twilio:", err)
 	}
 	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
@@ -161,7 +161,6 @@ func sms(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(jsonResponse, "AccountSid")
 	log.Println("Twilio: SMS recieved on number", jsonResponse["To"])
-	log.Println("Twilio: Callbacks", smsCallbacks)
 	for i, callback := range smsCallbacks {
 		if callback.number == jsonResponse["To"] {
 			log.Println("Twilio: Callback sent to", callback.id)

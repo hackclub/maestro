@@ -19,6 +19,7 @@ type hub struct {
 	unregister chan conn
 	receive    chan rawMsg
 	send       chan commands.Command
+	modules    map[string]chan<- commands.Command
 }
 
 func (h hub) run() {
@@ -46,7 +47,7 @@ func (h hub) run() {
 			}
 			log.Println("Hub: Recieved command", cmd.ID)
 			log.Println("Hub: Content", cmd)
-			module, ok := moduleChannels[cmd.Module]
+			module, ok := h.modules[cmd.Module]
 			if !ok {
 				log.Println("Hub:", cmd.Module, "not in modules")
 				break
@@ -80,6 +81,7 @@ var h = hub{
 	unregister: make(chan conn),
 	receive:    make(chan rawMsg),
 	send:       make(chan commands.Command),
+	modules:    make(map[string]chan<- commands.Command),
 }
 
 func Run() {

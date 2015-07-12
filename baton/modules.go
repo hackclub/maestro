@@ -23,13 +23,11 @@ type Module interface {
 	Handler() *mux.Router
 }
 
-var moduleChannels map[string]chan<- commands.Command
-
 func InitModules() {
-	moduleChannels = make(map[string]chan<- commands.Command)
+	h.modules = make(map[string]chan<- commands.Command)
 	for name, module := range modules {
 		cmd := make(chan commands.Command, 0)
-		moduleChannels[name] = cmd
+		h.modules[name] = cmd
 		module.Init(cmd, h.send)
 	}
 }

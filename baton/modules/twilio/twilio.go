@@ -85,6 +85,7 @@ func (t Twilio) sendSMS(body map[string]interface{}, id string) {
 	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
 		log.Println("Twilio: Error decoding body as JSON")
 		log.Println("Twilio:", err)
+		return
 	}
 	delete(jsonResponse, "account_sid")
 	send(id, "send-sms", jsonResponse)
@@ -113,6 +114,7 @@ func (t Twilio) makeCall(body map[string]interface{}, id string) {
 	if message, ok := jsonResponse["message"]; ok {
 		log.Println("Twilio: Error from Twilio server")
 		log.Println(message)
+		return
 	}
 	outboundCalls = append(outboundCalls, callback{jsonResponse["to"].(string), id, twiml})
 }

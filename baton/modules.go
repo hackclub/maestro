@@ -20,6 +20,9 @@ var modules = map[string]Module{
 
 type Module interface {
 	Init(cmd <-chan commands.Command, resp chan<- commands.Command)
+}
+
+type ModuleHandler interface {
 	Handler() *mux.Router
 }
 

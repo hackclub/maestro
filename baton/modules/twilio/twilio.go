@@ -27,7 +27,7 @@ var (
 
 type callback struct {
 	number string
-	id     string
+	id     commands.ID
 	data   string
 }
 
@@ -62,7 +62,7 @@ func (t Twilio) RunCommand(cmd commands.Command) {
 	}
 }
 
-func (t Twilio) sendSMS(body map[string]interface{}, id string) {
+func (t Twilio) sendSMS(body map[string]interface{}, id commands.ID) {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	form := url.Values{"To": {to}, "From": {from}}
@@ -91,7 +91,7 @@ func (t Twilio) sendSMS(body map[string]interface{}, id string) {
 	send(id, "send-sms", jsonResponse)
 }
 
-func (t Twilio) makeCall(body map[string]interface{}, id string) {
+func (t Twilio) makeCall(body map[string]interface{}, id commands.ID) {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
@@ -119,12 +119,12 @@ func (t Twilio) makeCall(body map[string]interface{}, id string) {
 	outboundCalls = append(outboundCalls, callback{jsonResponse["to"].(string), id, twiml})
 }
 
-func (t Twilio) recieveSMS(body map[string]interface{}, id string) {
+func (t Twilio) recieveSMS(body map[string]interface{}, id commands.ID) {
 	from := body["to"].(string)
 	smsCallbacks = append(smsCallbacks, callback{from, id, ""})
 }
 
-func (t Twilio) recieveCall(body map[string]interface{}, id string) {
+func (t Twilio) recieveCall(body map[string]interface{}, id commands.ID) {
 	to := body["to"].(string)
 	twiml := body["twiml"].(string)
 	inboundCalls[to] = callback{to, id, twiml}
@@ -214,7 +214,7 @@ func inboundCall(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func send(id string, call string, body interface{}) bool {
+func send(id commands.ID, call string, body interface{}) bool {
 	response <- commands.Command{"Twilio", call, id, body}
 	return true //will probably be replaced later
 }

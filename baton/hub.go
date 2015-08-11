@@ -13,8 +13,8 @@ type rawMsg struct {
 }
 
 type hub struct {
-	conns      map[conn][]string
-	ids        map[string]conn
+	conns      map[conn][]commands.ID
+	ids        map[commands.ID]conn
 	register   chan conn
 	unregister chan conn
 	receive    chan rawMsg
@@ -27,7 +27,7 @@ func (h hub) run() {
 		select {
 		case c := <-h.register:
 			log.Println("Hub: Registering conn", c)
-			h.conns[c] = make([]string, 0)
+			h.conns[c] = make([]commands.ID, 0)
 		case c := <-h.unregister:
 			log.Println("Hub: Unregistering conn", c)
 			if ids, ok := h.conns[c]; ok {
@@ -75,8 +75,8 @@ func (h hub) run() {
 }
 
 var h = hub{
-	conns:      make(map[conn][]string),
-	ids:        make(map[string]conn),
+	conns:      make(map[conn][]commands.ID),
+	ids:        make(map[commands.ID]conn),
 	register:   make(chan conn),
 	unregister: make(chan conn),
 	receive:    make(chan rawMsg),

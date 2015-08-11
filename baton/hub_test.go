@@ -8,8 +8,8 @@ import (
 
 func TestHub(t *testing.T) {
 	h := hub{
-		conns:      make(map[conn][]string),
-		ids:        make(map[string]conn),
+		conns:      make(map[conn][]commands.ID),
+		ids:        make(map[commands.ID]conn),
 		register:   make(chan conn),
 		unregister: make(chan conn),
 		receive:    make(chan rawMsg),

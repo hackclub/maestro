@@ -9,6 +9,10 @@ import (
 
 	"github.com/hackedu/maestro/app"
 	"github.com/hackedu/maestro/baton"
+	"github.com/hackedu/maestro/baton/modules/echo"
+	"github.com/hackedu/maestro/baton/modules/giphy"
+	"github.com/hackedu/maestro/baton/modules/neutrino"
+	"github.com/hackedu/maestro/baton/modules/twilio"
 )
 
 func init() {
@@ -85,11 +89,19 @@ The options are:
 	if fs.NArg() != 0 {
 		fs.Usage()
 	}
+	hub := baton.NewHub()
 
-	baton.InitModules()
-	go baton.Run()
+	hub.InitModules(map[string]baton.Module{
+		"Echo":  echo.Echo{},
+		"Giphy": giphy.Giphy{"dc6zaTOxFJmzC"}, //testing key from Giphy
+		"Neutrino": neutrino.Neutrino{"user-id",
+			"api-key"},
+		"Twilio": twilio.Twilio{"user-id",
+			"api-key"},
+	})
+	go hub.Run()
 	m := http.NewServeMux()
-	m.Handle("/baton/", http.StripPrefix("/baton", baton.Handler()))
+	m.Handle("/baton/", http.StripPrefix("/baton", hub.Handler()))
 	m.Handle("/", app.Handler())
 
 	log.Print("Listening on ", *httpAddr)

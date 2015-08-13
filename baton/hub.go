@@ -12,17 +12,18 @@ type rawMsg struct {
 	data []byte
 }
 
-type hub struct {
-	conns      map[conn][]commands.ID
-	ids        map[commands.ID]conn
-	register   chan conn
-	unregister chan conn
-	receive    chan rawMsg
-	send       chan commands.Command
-	modules    map[string]chan<- commands.Command
+type Hub struct {
+	conns          map[conn][]commands.ID
+	ids            map[commands.ID]conn
+	register       chan conn
+	unregister     chan conn
+	receive        chan rawMsg
+	send           chan commands.Command
+	modules        map[string]Module
+	moduleChannels map[string]chan<- commands.Command
 }
 
-func (h hub) run() {
+func (h *Hub) Run() {
 	for {
 		select {
 		case c := <-h.register:
@@ -47,9 +48,9 @@ func (h hub) run() {
 			}
 			log.Println("Hub: Recieved command", cmd.ID)
 			log.Println("Hub: Content", cmd)
-			module, ok := h.modules[cmd.Module]
+			module, ok := h.moduleChannels[cmd.Module]
 			if !ok {
-				log.Println("Hub:", cmd.Module, "not in modules")
+				log.Println("Hub:", cmd.Module, "not in modules", h.moduleChannels)
 				break
 			}
 			h.conns[rawMsg.conn] = append(h.conns[rawMsg.conn], cmd.ID)
@@ -74,16 +75,15 @@ func (h hub) run() {
 	}
 }
 
-var h = hub{
-	conns:      make(map[conn][]commands.ID),
-	ids:        make(map[commands.ID]conn),
-	register:   make(chan conn),
-	unregister: make(chan conn),
-	receive:    make(chan rawMsg),
-	send:       make(chan commands.Command),
-	modules:    make(map[string]chan<- commands.Command),
-}
-
-func Run() {
-	h.run()
+func NewHub() Hub {
+	return Hub{
+		conns:          make(map[conn][]commands.ID),
+		ids:            make(map[commands.ID]conn),
+		register:       make(chan conn),
+		unregister:     make(chan conn),
+		receive:        make(chan rawMsg),
+		send:           make(chan commands.Command),
+		modules:        nil,
+		moduleChannels: nil,
+	}
 }

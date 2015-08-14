@@ -2,8 +2,11 @@ package baton
 
 import (
 	"encoding/json"
-	"log"
+
+	"github.com/Sirupsen/logrus"
 )
+
+var log = logrus.New().WithField("module", "Hub")
 
 type rawMsg struct {
 	conn conn
@@ -34,12 +37,12 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case c := <-h.register:
-			log.Println("Hub: Registering conn", c)
+			log.Debug("Registering conn", c)
 			h.conns[c] = make([]CommandID, 0)
 		case c := <-h.unregister:
-			log.Println("Hub: Unregistering conn", c)
+			log.Debug("Unregistering conn", c)
 			if ids, ok := h.conns[c]; ok {
-				log.Println("Hub: Associated ids", ids)
+				log.Debug("Associated ids", ids)
 				delete(h.conns, c)
 				for _, id := range ids {
 					delete(h.ids, id)
@@ -49,15 +52,16 @@ func (h *Hub) Run() {
 		case rawMsg := <-h.receive:
 			var cmd Command
 			if err := json.Unmarshal(rawMsg.data, &cmd); err != nil {
-				log.Println("Hub: Error unmarshaling message into a command")
-				log.Println("Hub:", err)
+				log.WithFields(logrus.Fields{
+					"error":  err,
+					"rasMsg": rawMsg,
+				}).Error("Error unmarshaling message into a command")
 				break
 			}
-			log.Println("Hub: Recieved command", cmd.ID)
-			log.Println("Hub: Content", cmd)
+			log.WithField("command", cmd).Info("Command recieved")
 			module, ok := h.moduleChannels[cmd.Module]
 			if !ok {
-				log.Println("Hub:", cmd.Module, "not in modules")
+				log.WithField("command", cmd).Error("Module not found")
 				break
 			}
 			h.conns[rawMsg.conn] = append(h.conns[rawMsg.conn], cmd.ID)
@@ -65,18 +69,20 @@ func (h *Hub) Run() {
 			module <- cmd
 		case outMsg := <-h.send:
 			c, ok := h.ids[outMsg.ID]
-			log.Println("Hub: Message for ", outMsg.ID)
+			log.Debug("Command recieved")
 			if !ok {
-				log.Println("Hub:", outMsg.ID, "is associated with a disconnected client.")
+				log.WithField("id", outMsg.ID).Error("Unassociated ID")
 				break
 			}
-			log.Println(outMsg)
 			bytes, err := json.Marshal(outMsg)
 			if err != nil {
-				log.Println("Hub: Error marshaling Command into JSON")
-				log.Println("Hub:", err)
+				log.WithFields(logrus.Fields{
+					"error":   err,
+					"command": outMsg,
+				}).Error("Error unmarshaling message into a command")
 				break
 			}
+			log.WithField("command", outMsg).Info("Message sent")
 			c.send <- bytes
 		}
 	}

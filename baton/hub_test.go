@@ -2,15 +2,13 @@ package baton
 
 import (
 	"testing"
-
-	"github.com/hackedu/maestro/baton/commands"
 )
 
 func TestHub(t *testing.T) {
 	h := NewHub()
 
-	module := make(chan commands.Command)
-	h.moduleChannels = make(map[string]chan<- commands.Command)
+	module := make(chan Command)
+	h.moduleChannels = make(map[string]chan<- Command)
 	h.moduleChannels["module"] = module
 
 	go h.Run()

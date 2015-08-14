@@ -7,16 +7,16 @@ import (
 	"net/url"
 
 	"github.com/gorilla/mux"
-	"github.com/hackedu/maestro/baton/commands"
+	"github.com/hackedu/maestro/baton"
 )
 
 type Neutrino struct {
 	UserId, ApiKey string
 }
 
-var resp chan<- commands.Command
+var resp chan<- baton.Command
 
-func (n Neutrino) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+func (n Neutrino) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 	resp = resp
 	go func() {
 		for {
@@ -25,7 +25,7 @@ func (n Neutrino) Init(cmd <-chan commands.Command, resp chan<- commands.Command
 	}()
 }
 
-func (n Neutrino) RunCommand(cmd commands.Command) {
+func (n Neutrino) RunCommand(cmd baton.Command) {
 	v := url.Values{}
 	newBody := cmd.Body.(map[string]interface{})
 	switch cmd.Call {
@@ -63,7 +63,7 @@ func (n Neutrino) RunCommand(cmd commands.Command) {
 		log.Println("Neutrino: Error decoding body as JSON")
 		log.Println(err)
 	}
-	resp <- commands.Command{"Neutrino", cmd.Call, cmd.ID, out}
+	resp <- baton.Command{"Neutrino", cmd.Call, cmd.ID, out}
 }
 
 func (n Neutrino) Handler() *mux.Router {

@@ -2,11 +2,10 @@ package baton
 
 import (
 	"github.com/gorilla/mux"
-	"github.com/hackedu/maestro/baton/commands"
 )
 
 type Module interface {
-	Init(cmd <-chan commands.Command, resp chan<- commands.Command)
+	Init(cmd <-chan Command, resp chan<- Command)
 }
 
 type ModuleHandler interface {
@@ -14,9 +13,9 @@ type ModuleHandler interface {
 }
 
 func (h *Hub) InitModules(modules map[string]Module) {
-	h.moduleChannels = make(map[string]chan<- commands.Command)
+	h.moduleChannels = make(map[string]chan<- Command)
 	for name, module := range modules {
-		cmd := make(chan commands.Command, 0)
+		cmd := make(chan Command, 0)
 		h.moduleChannels[name] = cmd
 		module.Init(cmd, h.send)
 	}

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/hackedu/maestro/baton/commands"
+	"github.com/hackedu/maestro/baton"
 )
 
 type Twilio struct {
@@ -27,15 +27,15 @@ var (
 
 type callback struct {
 	number string
-	id     commands.ID
+	id     baton.CommandID
 	data   string
 }
 
 var client = &http.Client{}
 
-var response chan<- commands.Command
+var response chan<- baton.Command
 
-func (t Twilio) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+func (t Twilio) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 	response = resp
 	go func() {
 		for {
@@ -44,7 +44,7 @@ func (t Twilio) Init(cmd <-chan commands.Command, resp chan<- commands.Command) 
 	}()
 }
 
-func (t Twilio) RunCommand(cmd commands.Command) {
+func (t Twilio) RunCommand(cmd baton.Command) {
 	newBody := cmd.Body.(map[string]interface{})
 	switch cmd.Call {
 	case "send-sms":
@@ -62,7 +62,7 @@ func (t Twilio) RunCommand(cmd commands.Command) {
 	}
 }
 
-func (t Twilio) sendSMS(body map[string]interface{}, id commands.ID) {
+func (t Twilio) sendSMS(body map[string]interface{}, id baton.CommandID) {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	form := url.Values{"To": {to}, "From": {from}}
@@ -91,7 +91,7 @@ func (t Twilio) sendSMS(body map[string]interface{}, id commands.ID) {
 	send(id, "send-sms", jsonResponse)
 }
 
-func (t Twilio) makeCall(body map[string]interface{}, id commands.ID) {
+func (t Twilio) makeCall(body map[string]interface{}, id baton.CommandID) {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
@@ -119,12 +119,12 @@ func (t Twilio) makeCall(body map[string]interface{}, id commands.ID) {
 	outboundCalls = append(outboundCalls, callback{jsonResponse["to"].(string), id, twiml})
 }
 
-func (t Twilio) recieveSMS(body map[string]interface{}, id commands.ID) {
+func (t Twilio) recieveSMS(body map[string]interface{}, id baton.CommandID) {
 	from := body["to"].(string)
 	smsCallbacks = append(smsCallbacks, callback{from, id, ""})
 }
 
-func (t Twilio) recieveCall(body map[string]interface{}, id commands.ID) {
+func (t Twilio) recieveCall(body map[string]interface{}, id baton.CommandID) {
 	to := body["to"].(string)
 	twiml := body["twiml"].(string)
 	inboundCalls[to] = callback{to, id, twiml}
@@ -214,7 +214,7 @@ func inboundCall(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func send(id commands.ID, call string, body interface{}) bool {
-	response <- commands.Command{"Twilio", call, id, body}
+func send(id baton.CommandID, call string, body interface{}) bool {
+	response <- baton.Command{"Twilio", call, id, body}
 	return true //will probably be replaced later
 }

@@ -1,0 +1,15 @@
+machine:
+  environment:
+    GOPATH: "$HOME/gopath"
+
+dependencies:
+  override:
+    - mkdir -p $GOPATH/src/github.com/hackedu/
+    - cp -R $HOME/maestro $GOPATH/src/github.com/hackedu/
+    - cd $GOPATH/src/github.com/hackedu/maestro; go get ./...
+  cache_directories:
+    - "$GOPATH"
+
+test:
+  override:
+    - go test -v ./... -race

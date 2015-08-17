@@ -71,7 +71,7 @@ func (h *Hub) Run() {
 			c, ok := h.ids[outMsg.ID]
 			log.Debug("Command recieved")
 			if !ok {
-				log.WithField("id", outMsg.ID).Error("Unassociated ID")
+				log.WithField("command", outMsg).Error("Unassociated ID")
 				break
 			}
 			bytes, err := json.Marshal(outMsg)

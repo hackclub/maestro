@@ -16,7 +16,9 @@ func Handler() *mux.Router {
 	for name, module := range modules {
 		//PathPrefix needed to make it behave like http.Handle
 		// /webhooks must be included because their documentation lies
-		m.PathPrefix(fmt.Sprintf("/webhooks/%s", name)).Handler(http.StripPrefix(fmt.Sprintf("/webhooks/%s", name), module.Handler()))
+		if module, ok := module.(ModuleHandler); ok {
+			m.PathPrefix(fmt.Sprintf("/webhooks/%s", name)).Handler(http.StripPrefix(fmt.Sprintf("/webhooks/%s", name), module.Handler()))
+		}
 	}
 	return m
 }

@@ -2,94 +2,86 @@ package baton
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
-)
 
-type command struct {
-	Module string      `json:"module"`
-	Call   string      `json:"call"`
-	ID     string      `json:"id"`
-	Body   interface{} `json:"body"`
-}
+	"github.com/hackedu/maestro/baton/commands"
+)
 
 type rawMsg struct {
 	conn conn
 	data []byte
 }
 
-type msg struct {
-	conn conn
-	cmd  command
-}
-
 type hub struct {
-	conns      map[conn]struct{}
+	conns      map[conn][]commands.ID
+	ids        map[commands.ID]conn
 	register   chan conn
 	unregister chan conn
 	receive    chan rawMsg
+	send       chan commands.Command
+	modules    map[string]chan<- commands.Command
 }
 
 func (h hub) run() {
 	for {
 		select {
 		case c := <-h.register:
-			h.conns[c] = struct{}{}
+			log.Println("Hub: Registering conn", c)
+			h.conns[c] = make([]commands.ID, 0)
 		case c := <-h.unregister:
-			if _, ok := h.conns[c]; ok {
+			log.Println("Hub: Unregistering conn", c)
+			if ids, ok := h.conns[c]; ok {
+				log.Println("Hub: Associated ids", ids)
 				delete(h.conns, c)
+				for _, id := range ids {
+					delete(h.ids, id)
+				}
 				close(c.send)
 			}
 		case rawMsg := <-h.receive:
-			var cmd command
+			var cmd commands.Command
 			if err := json.Unmarshal(rawMsg.data, &cmd); err != nil {
-				fmt.Println("nu")
-				log.Println(err)
+				log.Println("Hub: Error unmarshaling message into a command")
+				log.Println("Hub:", err)
 				break
 			}
-			fmt.Println(cmd)
-			msg := msg{rawMsg.conn, cmd}
-			processMessage(msg)
-		}
-	}
-}
-
-func processMessage(message msg) {
-	resp := make(chan interface{})
-	module, ok := modules[message.cmd.Module]
-	if !ok {
-		fmt.Println(message.cmd.Module, "not in", modules)
-		return
-	}
-
-	go func() {
-		for {
-			r, ok := <-resp
+			log.Println("Hub: Recieved command", cmd.ID)
+			log.Println("Hub: Content", cmd)
+			module, ok := h.modules[cmd.Module]
 			if !ok {
-				close(resp)
+				log.Println("Hub:", cmd.Module, "not in modules")
 				break
 			}
-			bytes, err := json.Marshal(command{message.cmd.Module, message.cmd.Call, message.cmd.ID, r}) //add in Module and Call info for client
+			h.conns[rawMsg.conn] = append(h.conns[rawMsg.conn], cmd.ID)
+			h.ids[cmd.ID] = rawMsg.conn
+			module <- cmd
+		case outMsg := <-h.send:
+			c, ok := h.ids[outMsg.ID]
+			log.Println("Hub: Message for ", outMsg.ID)
+			if !ok {
+				log.Println("Hub:", outMsg.ID, "is associated with a disconnected client.")
+				break
+			}
+			log.Println(outMsg)
+			bytes, err := json.Marshal(outMsg)
 			if err != nil {
-				log.Println("Error Marshaling")
-				log.Println(err)
+				log.Println("Hub: Error marshaling commands.Command into JSON")
+				log.Println("Hub:", err)
 				break
 			}
-			message.conn.send <- bytes
+			c.send <- bytes
 		}
-	}()
-	go func() {
-		if err := module.RunCommand(message.cmd.Call, message.cmd.Body, resp); err != nil {
-			fmt.Println(err)
-		}
-	}()
+	}
 }
 
 var h = hub{
-	conns:      make(map[conn]struct{}),
+	conns:      make(map[conn][]commands.ID),
+	ids:        make(map[commands.ID]conn),
 	register:   make(chan conn),
 	unregister: make(chan conn),
 	receive:    make(chan rawMsg),
+	send:       make(chan commands.Command),
+	modules:    make(map[string]chan<- commands.Command),
 }
 
 func Run() {

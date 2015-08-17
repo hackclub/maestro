@@ -2,103 +2,134 @@ package twilio
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/hackedu/maestro/baton/commands"
 )
 
 type Twilio struct {
 	UserId, ApiKey string
 }
 
+var URL = os.Getenv("HOSTLOCATION")
+
 var (
 	smsCallbacks  = make([]callback, 0)
-	callCallbacks = make([]callback, 0)
+	outboundCalls = make([]callback, 0)
+	inboundCalls  = make(map[string]callback)
 )
 
 type callback struct {
 	number string
-	resp   chan<- interface{}
+	id     commands.ID
 	data   string
 }
 
 var client = &http.Client{}
 
-func (t Twilio) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
-	newBody := body.(map[string]interface{})
-	switch cmd {
+var response chan<- commands.Command
+
+func (t Twilio) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+	response = resp
+	go func() {
+		for {
+			go t.RunCommand(<-cmd)
+		}
+	}()
+}
+
+func (t Twilio) RunCommand(cmd commands.Command) {
+	newBody := cmd.Body.(map[string]interface{})
+	switch cmd.Call {
 	case "send-sms":
-		return t.sendSMS(newBody, resp)
+		t.sendSMS(newBody, cmd.ID)
+	case "send-mms":
+		t.sendSMS(newBody, cmd.ID)
 	case "recieve-sms":
-		return t.recieveSMS(newBody, resp)
+		t.recieveSMS(newBody, cmd.ID)
 	case "send-call":
-		return t.makeCall(newBody, resp)
+		t.makeCall(newBody, cmd.ID)
 	case "recieve-call":
-		return t.recieveCall(newBody, resp)
+		t.recieveCall(newBody, cmd.ID)
 	default:
-		return errors.New("unknown command: " + cmd)
+		log.Println("Twilio: unknown command", cmd.Call)
 	}
 }
 
-func (t Twilio) sendSMS(body map[string]interface{}, resp chan<- interface{}) error {
+func (t Twilio) sendSMS(body map[string]interface{}, id commands.ID) {
 	to := body["to"].(string)
 	from := body["from"].(string)
-	message := body["body"].(string)
-	form := url.Values{"To": {to}, "From": {from}, "Body": {message}}
+	form := url.Values{"To": {to}, "From": {from}}
+
+	if message, ok := body["body"]; ok {
+		form.Add("Body", message.(string))
+	}
+	if url, ok := body["url"]; ok {
+		form.Add("MediaUrl", url.(string))
+	}
 
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.UserId), form)
 	if err != nil {
-		return err
+		log.Println("Twilio: Error in POST to /Messages.json")
+		log.Println("Twilio:", err)
 	}
 	defer res.Body.Close()
 
 	var jsonResponse map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
-		return err
+		log.Println("Twilio: Error decoding body as JSON")
+		log.Println("Twilio:", err)
+		return
 	}
 	delete(jsonResponse, "account_sid")
-	resp <- jsonResponse
-	return nil
+	send(id, "send-sms", jsonResponse)
 }
 
-func (t Twilio) makeCall(body map[string]interface{}, resp chan<- interface{}) error {
+func (t Twilio) makeCall(body map[string]interface{}, id commands.ID) {
 	to := body["to"].(string)
 	from := body["from"].(string)
 	twiml := body["twiml"].(string)
-	form := url.Values{"To": {to}, "From": {from}, "Url": {"http://524b95fe.ngrok.io/baton/webhooks/Twilio/call"}} //temporary
+
+	form := url.Values{"To": {to}, "From": {from}, "Url": {URL + "/baton/webhooks/Twilio/call/outbound"}}
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls.json", t.UserId), form)
 	if err != nil {
-		return err
+		log.Println("Twilio: Error in POST to /Calls")
+		log.Println(err)
 	}
 	defer res.Body.Close()
 
 	var jsonResponse map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
-		return err
+		log.Println("Twilio: Error decoding body as JSON")
+		log.Println(err)
 	}
 	delete(jsonResponse, "account_sid")
-	if message, ok := jsonResponse["Message"]; ok {
-		return errors.New(message.(string))
+	send(id, "send-call", jsonResponse)
+	if message, ok := jsonResponse["message"]; ok {
+		log.Println("Twilio: Error from Twilio server")
+		log.Println(message)
+		return
 	}
-	callCallbacks = append(callCallbacks, callback{to, resp, twiml})
-	return nil
-}
-func (t Twilio) recieveSMS(body map[string]interface{}, resp chan<- interface{}) error {
-	from := body["from"].(string)
-	smsCallbacks = append(smsCallbacks, callback{from, resp, ""})
-	return nil
+	outboundCalls = append(outboundCalls, callback{jsonResponse["to"].(string), id, twiml})
 }
 
-func (t Twilio) recieveCall(body map[string]interface{}, resp chan<- interface{}) error {
-	from := body["from"].(string)
-	twiml := body["twiml"].(string)
-	callCallbacks = append(callCallbacks, callback{from, resp, twiml})
-	return nil
+func (t Twilio) recieveSMS(body map[string]interface{}, id commands.ID) {
+	from := body["to"].(string)
+	smsCallbacks = append(smsCallbacks, callback{from, id, ""})
 }
+
+func (t Twilio) recieveCall(body map[string]interface{}, id commands.ID) {
+	to := body["to"].(string)
+	twiml := body["twiml"].(string)
+	inboundCalls[to] = callback{to, id, twiml}
+}
+
 func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -116,53 +147,74 @@ func (t Twilio) postForm(url string, form url.Values) (*http.Response, error) {
 func (t Twilio) Handler() *mux.Router {
 	m := mux.NewRouter()
 	m.Path("/sms").HandlerFunc(sms)
-	m.Path("/call").HandlerFunc(call)
+	m.Path("/call/inbound").HandlerFunc(inboundCall)
+	m.Path("/call/outbound").HandlerFunc(outboundCall)
 	return m
 }
+
 func sms(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		fmt.Println(err)
+		log.Println("Twilio: Error parsing form")
+		log.Println("Twilio:", err)
 	}
 	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
 		jsonResponse[name] = val[0]
 	}
 	delete(jsonResponse, "AccountSid")
-	for _, callback := range smsCallbacks {
-		if callback.number == jsonResponse["From"] || callback.number == "*" {
-			callback.resp <- jsonResponse
+	log.Println("Twilio: SMS recieved on number", jsonResponse["To"])
+	for i, callback := range smsCallbacks {
+		if callback.number == jsonResponse["To"] {
+			log.Println("Twilio: Callback sent to", callback.id)
+			if !send(callback.id, "recieve-sms", jsonResponse) {
+				smsCallbacks = append(smsCallbacks[:i], smsCallbacks[i+1:]...)
+			}
 		}
 	}
-
-	fmt.Println(jsonResponse)
 }
-func call(w http.ResponseWriter, r *http.Request) {
+
+func outboundCall(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		return
+		log.Println("Twilio: Error parsing form")
+		log.Println("Twilio", err)
 	}
 	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
 		jsonResponse[name] = val[0]
 	}
 	delete(jsonResponse, "AccountSid")
-	for i, callback := range callCallbacks {
-		if "inbound" == jsonResponse["Direction"] {
-			if callback.number == jsonResponse["Caller"] {
-				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-				callback.resp <- jsonResponse
-				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
-				break
-			}
-		} else {
-			if callback.number == jsonResponse["Called"] {
-				fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
-				callback.resp <- jsonResponse
-				callCallbacks = append(callCallbacks[:i], callCallbacks[i+1:]...)
-				break
-			}
+	for i, callback := range outboundCalls {
+		if callback.number == jsonResponse["Called"] {
+			fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
+			send(callback.id, "send-call", jsonResponse)
+			outboundCalls = append(outboundCalls[:i], outboundCalls[i+1:]...)
+			break
 		}
 	}
+}
 
-	fmt.Println(callCallbacks)
+func inboundCall(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		log.Println("Twilio: Error parsing form")
+		log.Println("Twilio:", err)
+	}
+
+	jsonResponse := make(map[string]string)
+	for name, val := range r.PostForm {
+		jsonResponse[name] = val[0]
+	}
+	delete(jsonResponse, "AccountSid")
+	if callback, ok := inboundCalls[jsonResponse["Called"]]; ok {
+		fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
+		if !send(callback.id, "recieve-call", jsonResponse) {
+			delete(inboundCalls, jsonResponse["Called"])
+		}
+	}
+}
+
+func send(id commands.ID, call string, body interface{}) bool {
+	response <- commands.Command{"Twilio", call, id, body}
+	return true //will probably be replaced later
 }

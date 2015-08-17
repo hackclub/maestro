@@ -1,23 +1,32 @@
 package echo
 
 import (
-	"errors"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/hackedu/maestro/baton/commands"
 )
 
 type Echo struct {
 }
 
-func (e Echo) RunCommand(cmd string, body interface{}, resp chan<- interface{}) error {
-	if cmd != "echo" {
-		return errors.New("unknown command: " + cmd)
-	}
-	resp <- body
-	return nil
+var resp chan<- commands.Command
+
+func (e Echo) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+	resp = resp
+	go func() {
+		for {
+			tmp := <-cmd
+			if tmp.Call != "echo" {
+				log.Println("Echo: unknown command", tmp.Call)
+				continue
+			}
+			log.Println("Echo: processing command", tmp.ID)
+			resp <- tmp
+		}
+	}()
 }
 
 func (e Echo) Handler() *mux.Router {
@@ -27,8 +36,10 @@ func (e Echo) Handler() *mux.Router {
 }
 
 func echo(w http.ResponseWriter, r *http.Request) {
+	log.Println("Echo: Recieved Message over HTTP")
 	_, err := io.Copy(w, r.Body)
 	if err != nil {
-		fmt.Println(err)
+		log.Println("Echo:", "Error copying request body")
+		log.Println("Echo:", err)
 	}
 }

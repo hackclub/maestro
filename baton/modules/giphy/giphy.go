@@ -11,7 +11,7 @@ import (
 	"github.com/hackedu/maestro/baton"
 )
 
-var log = logrus.New().WithField("module", "Giphy")
+var log = logrus.WithField("module", "Giphy")
 
 type Giphy struct {
 	ApiKey string
@@ -20,15 +20,14 @@ type Giphy struct {
 var resp chan<- baton.Command
 
 func (g Giphy) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
-	resp = resp
 	go func() {
 		for {
-			go g.RunCommand(<-cmd)
+			go g.RunCommand(<-cmd, resp)
 		}
 	}()
 }
 
-func (g Giphy) RunCommand(cmd baton.Command) {
+func (g Giphy) RunCommand(cmd baton.Command, resp chan<- baton.Command) {
 	var u url.URL
 	var err error
 	switch cmd.Call {

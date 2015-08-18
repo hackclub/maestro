@@ -9,12 +9,10 @@ import (
 	"github.com/hackedu/maestro/baton"
 )
 
-var log = logrus.New().WithField("module", "Echo")
+var log = logrus.WithField("module", "Echo")
 
 type Echo struct {
 }
-
-var resp chan<- baton.Command
 
 func (e Echo) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 	resp = resp

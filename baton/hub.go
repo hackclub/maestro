@@ -6,7 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-var log = logrus.New().WithField("module", "Hub")
+var log = logrus.WithField("module", "Hub")
 
 type rawMsg struct {
 	conn conn
@@ -69,7 +69,7 @@ func (h *Hub) Run() {
 			module <- cmd
 		case outMsg := <-h.send:
 			c, ok := h.ids[outMsg.ID]
-			log.Debug("Command recieved")
+			log.WithField("command", outMsg).Debug("Message recieved")
 			if !ok {
 				log.WithField("command", outMsg).Error("Unassociated ID")
 				break

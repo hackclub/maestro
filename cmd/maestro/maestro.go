@@ -89,6 +89,7 @@ The options are:
 	if fs.NArg() != 0 {
 		fs.Usage()
 	}
+
 	hub := baton.NewHub()
 
 	hub.InitModules(map[string]baton.Module{

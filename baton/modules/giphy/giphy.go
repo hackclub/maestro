@@ -9,16 +9,16 @@ import (
 	"net/url"
 
 	"github.com/gorilla/mux"
-	"github.com/hackedu/maestro/baton/commands"
+	"github.com/hackedu/maestro/baton"
 )
 
 type Giphy struct {
 	ApiKey string
 }
 
-var resp chan<- commands.Command
+var resp chan<- baton.Command
 
-func (g Giphy) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+func (g Giphy) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 	resp = resp
 	go func() {
 		for {
@@ -27,7 +27,7 @@ func (g Giphy) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
 	}()
 }
 
-func (g Giphy) RunCommand(cmd commands.Command) error {
+func (g Giphy) RunCommand(cmd baton.Command) error {
 	var u url.URL
 	var err error
 	switch cmd.Call {
@@ -68,7 +68,7 @@ func (g Giphy) RunCommand(cmd commands.Command) error {
 		log.Println("Giphy: Error decoding body as JSON")
 		log.Println("Giphy:", err)
 	}
-	resp <- commands.Command{"Giphy", cmd.Call, cmd.ID, out}
+	resp <- baton.Command{"Giphy", cmd.Call, cmd.ID, out}
 	return nil
 }
 

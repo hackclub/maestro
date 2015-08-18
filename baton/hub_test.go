@@ -2,25 +2,16 @@ package baton
 
 import (
 	"testing"
-
-	"github.com/hackedu/maestro/baton/commands"
 )
 
 func TestHub(t *testing.T) {
-	h := hub{
-		conns:      make(map[conn][]commands.ID),
-		ids:        make(map[commands.ID]conn),
-		register:   make(chan conn),
-		unregister: make(chan conn),
-		receive:    make(chan rawMsg),
-		send:       make(chan commands.Command),
-		modules:    make(map[string]chan<- commands.Command),
-	}
+	h := NewHub()
 
-	module := make(chan commands.Command)
-	h.modules["module"] = module
+	module := make(chan Command)
+	h.moduleChannels = make(map[string]chan<- Command)
+	h.moduleChannels["module"] = module
 
-	go h.run()
+	go h.Run()
 
 	user := conn{nil, make(chan []byte)}
 	h.register <- user

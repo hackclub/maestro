@@ -10,10 +10,10 @@ import (
 	"github.com/hackedu/maestro/router"
 )
 
-func Handler() *mux.Router {
+func (h Hub) Handler() *mux.Router {
 	m := router.Baton()
-	m.Get(router.BatonConnect).HandlerFunc(serveWs)
-	for name, module := range modules {
+	m.Get(router.BatonConnect).HandlerFunc(h.serveWs)
+	for name, module := range h.modules {
 		//PathPrefix needed to make it behave like http.Handle
 		// /webhooks must be included because their documentation lies
 		if module, ok := module.(ModuleHandler); ok {
@@ -25,7 +25,7 @@ func Handler() *mux.Router {
 
 var i = 0
 
-func serveWs(w http.ResponseWriter, r *http.Request) {
+func (h Hub) serveWs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return

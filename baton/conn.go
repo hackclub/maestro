@@ -36,7 +36,7 @@ type conn struct {
 }
 
 // readPump pumps messages from the websocket connection to the hub
-func (c conn) readPump(h hub) {
+func (c conn) readPump(h Hub) {
 	defer func() {
 		h.unregister <- c
 		c.ws.Close()

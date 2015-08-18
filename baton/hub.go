@@ -3,8 +3,6 @@ package baton
 import (
 	"encoding/json"
 	"log"
-
-	"github.com/hackedu/maestro/baton/commands"
 )
 
 type rawMsg struct {
@@ -12,22 +10,32 @@ type rawMsg struct {
 	data []byte
 }
 
-type hub struct {
-	conns      map[conn][]commands.ID
-	ids        map[commands.ID]conn
-	register   chan conn
-	unregister chan conn
-	receive    chan rawMsg
-	send       chan commands.Command
-	modules    map[string]chan<- commands.Command
+type CommandID string
+
+type Command struct {
+	Module string      `json:"module"`
+	Call   string      `json:"call"`
+	ID     CommandID   `json:"id"`
+	Body   interface{} `json:"body"`
 }
 
-func (h hub) run() {
+type Hub struct {
+	conns          map[conn][]CommandID
+	ids            map[CommandID]conn
+	register       chan conn
+	unregister     chan conn
+	receive        chan rawMsg
+	send           chan Command
+	modules        map[string]Module
+	moduleChannels map[string]chan<- Command
+}
+
+func (h *Hub) Run() {
 	for {
 		select {
 		case c := <-h.register:
 			log.Println("Hub: Registering conn", c)
-			h.conns[c] = make([]commands.ID, 0)
+			h.conns[c] = make([]CommandID, 0)
 		case c := <-h.unregister:
 			log.Println("Hub: Unregistering conn", c)
 			if ids, ok := h.conns[c]; ok {
@@ -39,7 +47,7 @@ func (h hub) run() {
 				close(c.send)
 			}
 		case rawMsg := <-h.receive:
-			var cmd commands.Command
+			var cmd Command
 			if err := json.Unmarshal(rawMsg.data, &cmd); err != nil {
 				log.Println("Hub: Error unmarshaling message into a command")
 				log.Println("Hub:", err)
@@ -47,7 +55,7 @@ func (h hub) run() {
 			}
 			log.Println("Hub: Recieved command", cmd.ID)
 			log.Println("Hub: Content", cmd)
-			module, ok := h.modules[cmd.Module]
+			module, ok := h.moduleChannels[cmd.Module]
 			if !ok {
 				log.Println("Hub:", cmd.Module, "not in modules")
 				break
@@ -65,7 +73,7 @@ func (h hub) run() {
 			log.Println(outMsg)
 			bytes, err := json.Marshal(outMsg)
 			if err != nil {
-				log.Println("Hub: Error marshaling commands.Command into JSON")
+				log.Println("Hub: Error marshaling Command into JSON")
 				log.Println("Hub:", err)
 				break
 			}
@@ -74,16 +82,15 @@ func (h hub) run() {
 	}
 }
 
-var h = hub{
-	conns:      make(map[conn][]commands.ID),
-	ids:        make(map[commands.ID]conn),
-	register:   make(chan conn),
-	unregister: make(chan conn),
-	receive:    make(chan rawMsg),
-	send:       make(chan commands.Command),
-	modules:    make(map[string]chan<- commands.Command),
-}
-
-func Run() {
-	h.run()
+func NewHub() Hub {
+	return Hub{
+		conns:          make(map[conn][]CommandID),
+		ids:            make(map[CommandID]conn),
+		register:       make(chan conn),
+		unregister:     make(chan conn),
+		receive:        make(chan rawMsg),
+		send:           make(chan Command),
+		modules:        nil,
+		moduleChannels: nil,
+	}
 }

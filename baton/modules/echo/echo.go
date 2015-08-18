@@ -6,15 +6,15 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/hackedu/maestro/baton/commands"
+	"github.com/hackedu/maestro/baton"
 )
 
 type Echo struct {
 }
 
-var resp chan<- commands.Command
+var resp chan<- baton.Command
 
-func (e Echo) Init(cmd <-chan commands.Command, resp chan<- commands.Command) {
+func (e Echo) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 	resp = resp
 	go func() {
 		for {

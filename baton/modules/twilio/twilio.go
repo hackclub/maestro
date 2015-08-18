@@ -3,15 +3,17 @@ package twilio
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/baton"
 )
+
+var log = logrus.WithField("module", "Twilio")
 
 type Twilio struct {
 	UserId, ApiKey string
@@ -58,7 +60,7 @@ func (t Twilio) RunCommand(cmd baton.Command) {
 	case "recieve-call":
 		t.recieveCall(newBody, cmd.ID)
 	default:
-		log.Println("Twilio: unknown command", cmd.Call)
+		log.WithField("command", cmd).Error("Unknown command")
 	}
 }
 
@@ -76,15 +78,14 @@ func (t Twilio) sendSMS(body map[string]interface{}, id baton.CommandID) {
 
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.UserId), form)
 	if err != nil {
-		log.Println("Twilio: Error in POST to /Messages.json")
-		log.Println("Twilio:", err)
+		log.WithField("error", err).Error("Error in POST to /Messages.json")
+		return
 	}
 	defer res.Body.Close()
 
 	var jsonResponse map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
-		log.Println("Twilio: Error decoding body as JSON")
-		log.Println("Twilio:", err)
+		log.WithField("error", err).Error("Error decoding body as JSON")
 		return
 	}
 	delete(jsonResponse, "account_sid")
@@ -99,21 +100,20 @@ func (t Twilio) makeCall(body map[string]interface{}, id baton.CommandID) {
 	form := url.Values{"To": {to}, "From": {from}, "Url": {URL + "/baton/webhooks/Twilio/call/outbound"}}
 	res, err := t.postForm(fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls.json", t.UserId), form)
 	if err != nil {
-		log.Println("Twilio: Error in POST to /Calls")
-		log.Println(err)
+		log.WithField("error", err).Error("Error in POST to /Calls")
+		return
 	}
 	defer res.Body.Close()
 
 	var jsonResponse map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
-		log.Println("Twilio: Error decoding body as JSON")
-		log.Println(err)
+		log.WithField("error", err).Error("Error decoding body as JSON")
+		return
 	}
 	delete(jsonResponse, "account_sid")
 	send(id, "send-call", jsonResponse)
-	if message, ok := jsonResponse["message"]; ok {
-		log.Println("Twilio: Error from Twilio server")
-		log.Println(message)
+	if _, ok := jsonResponse["message"]; ok {
+		log.WithField("error", jsonResponse).Error("Error from Twilio server")
 		return
 	}
 	outboundCalls = append(outboundCalls, callback{jsonResponse["to"].(string), id, twiml})
@@ -154,18 +154,21 @@ func (t Twilio) Handler() *mux.Router {
 
 func sms(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		log.Println("Twilio: Error parsing form")
-		log.Println("Twilio:", err)
+		log.WithField("error", err).Error("Error parsing form")
+		return
 	}
 	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
 		jsonResponse[name] = val[0]
 	}
 	delete(jsonResponse, "AccountSid")
-	log.Println("Twilio: SMS recieved on number", jsonResponse["To"])
+	log.WithField("number", jsonResponse["To"]).Info("SMS recieved on number")
 	for i, callback := range smsCallbacks {
 		if callback.number == jsonResponse["To"] {
-			log.Println("Twilio: Callback sent to", callback.id)
+			log.WithFields(logrus.Fields{
+				"number": jsonResponse["To"],
+				"id":     callback.id,
+			}).Debug("Callback sent to")
 			if !send(callback.id, "recieve-sms", jsonResponse) {
 				smsCallbacks = append(smsCallbacks[:i], smsCallbacks[i+1:]...)
 			}
@@ -174,16 +177,16 @@ func sms(w http.ResponseWriter, r *http.Request) {
 }
 
 func outboundCall(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
-		log.Println("Twilio: Error parsing form")
-		log.Println("Twilio", err)
+	if err := r.ParseForm(); err != nil {
+		log.WithField("error", err).Error("Error parsing form")
+		return
 	}
 	jsonResponse := make(map[string]string)
 	for name, val := range r.PostForm {
 		jsonResponse[name] = val[0]
 	}
 	delete(jsonResponse, "AccountSid")
+	log.WithField("number", jsonResponse["Called"]).Info("Outbound call")
 	for i, callback := range outboundCalls {
 		if callback.number == jsonResponse["Called"] {
 			fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
@@ -195,10 +198,9 @@ func outboundCall(w http.ResponseWriter, r *http.Request) {
 }
 
 func inboundCall(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
-		log.Println("Twilio: Error parsing form")
-		log.Println("Twilio:", err)
+	if err := r.ParseForm(); err != nil {
+		log.WithField("error", err).Error("Error parsing form")
+		return
 	}
 
 	jsonResponse := make(map[string]string)
@@ -206,6 +208,7 @@ func inboundCall(w http.ResponseWriter, r *http.Request) {
 		jsonResponse[name] = val[0]
 	}
 	delete(jsonResponse, "AccountSid")
+	log.WithField("number", jsonResponse["Called"]).Info("Inbound call")
 	if callback, ok := inboundCalls[jsonResponse["Called"]]; ok {
 		fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>%s</Response>", callback.data)
 		if !send(callback.id, "recieve-call", jsonResponse) {

@@ -7,7 +7,6 @@ import (
 	"net/url"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/baton"
 )
 
@@ -85,8 +84,4 @@ func (g Giphy) makeURL(path string, v url.Values) (url.URL, error) {
 	u := baseURL.ResolveReference(rel)
 	u.RawQuery = v.Encode()
 	return *u, nil
-}
-
-func (g Giphy) Handler() *mux.Router {
-	return mux.NewRouter()
 }

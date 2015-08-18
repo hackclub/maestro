@@ -2,15 +2,16 @@ package giphy
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/baton"
 )
+
+var log = logrus.New().WithField("module", "Giphy")
 
 type Giphy struct {
 	ApiKey string
@@ -27,7 +28,7 @@ func (g Giphy) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 	}()
 }
 
-func (g Giphy) RunCommand(cmd baton.Command) error {
+func (g Giphy) RunCommand(cmd baton.Command) {
 	var u url.URL
 	var err error
 	switch cmd.Call {
@@ -49,27 +50,28 @@ func (g Giphy) RunCommand(cmd baton.Command) error {
 	case "trending":
 		u, err = g.makeURL("gifs/trending", url.Values{})
 	default:
-		return errors.New("unknown command: " + cmd.Call)
+		log.WithField("command", cmd).Error("Unknown Command")
+		return
 	}
 	if err != nil {
-		log.Println("Giphy: error making URL")
-		log.Println("Giphy:", err)
+		log.WithField("error", err).Error("Error making URL")
+		return
 	}
-	log.Println("Giphy: URL to be requested", u.String())
+
+	log.WithField("URL", u.String()).Debug("URL to be requested")
 	res, err := http.Get(u.String())
 	if err != nil {
-		log.Println("Giphy: Error in GET request")
-		log.Println("Giphy:", err)
+		log.WithField("error", err).Error("Error in GET request")
+		return
 	}
 	defer res.Body.Close()
 
 	var out interface{}
 	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
-		log.Println("Giphy: Error decoding body as JSON")
-		log.Println("Giphy:", err)
+		log.WithField("error", err).Error("Error decoding body as JSON")
+		return
 	}
 	resp <- baton.Command{"Giphy", cmd.Call, cmd.ID, out}
-	return nil
 }
 
 func (g Giphy) makeURL(path string, v url.Values) (url.URL, error) {
@@ -85,6 +87,7 @@ func (g Giphy) makeURL(path string, v url.Values) (url.URL, error) {
 	u.RawQuery = v.Encode()
 	return *u, nil
 }
+
 func (g Giphy) Handler() *mux.Router {
 	return mux.NewRouter()
 }

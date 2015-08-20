@@ -2,7 +2,6 @@ package baton
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -32,7 +31,7 @@ func (h Hub) serveWs(w http.ResponseWriter, r *http.Request) {
 	}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		log.WithField("error", err).Error("Couldn't upgrade connection")
 		return
 	}
 	c := conn{send: make(chan []byte, 256), ws: ws}

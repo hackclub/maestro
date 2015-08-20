@@ -2,30 +2,28 @@ package neutrino
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/url"
 
-	"github.com/gorilla/mux"
+	"github.com/Sirupsen/logrus"
 	"github.com/hackedu/maestro/baton"
 )
+
+var log = logrus.WithField("module", "Neutrino")
 
 type Neutrino struct {
 	UserId, ApiKey string
 }
 
-var resp chan<- baton.Command
-
 func (n Neutrino) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
-	resp = resp
 	go func() {
 		for {
-			go n.RunCommand(<-cmd)
+			go n.RunCommand(<-cmd, resp)
 		}
 	}()
 }
 
-func (n Neutrino) RunCommand(cmd baton.Command) {
+func (n Neutrino) RunCommand(cmd baton.Command, resp chan<- baton.Command) {
 	v := url.Values{}
 	newBody := cmd.Body.(map[string]interface{})
 	switch cmd.Call {
@@ -51,21 +49,19 @@ func (n Neutrino) RunCommand(cmd baton.Command) {
 	v.Add("ip", "162.209.104.195")
 	url := "https://neutrinoapi.com/" + cmd.Call
 
+	log.WithField("URL", url).Debug("URL to be requested")
+
 	data, err := http.PostForm(url, v)
 	if err != nil {
-		log.Println("Neutrino: Could not POST data")
-		log.Println(err)
+		log.WithField("error", err).Error("Could not POST data")
+		return
 	}
 	defer data.Body.Close()
 
 	var out interface{}
 	if err := json.NewDecoder(data.Body).Decode(&out); err != nil {
-		log.Println("Neutrino: Error decoding body as JSON")
-		log.Println(err)
+		log.WithField("error", err).Error("Error decoding body as JSON")
+		return
 	}
 	resp <- baton.Command{"Neutrino", cmd.Call, cmd.ID, out}
-}
-
-func (n Neutrino) Handler() *mux.Router {
-	return mux.NewRouter()
 }

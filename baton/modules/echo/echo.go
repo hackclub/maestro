@@ -2,17 +2,17 @@ package echo
 
 import (
 	"io"
-	"log"
 	"net/http"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/hackedu/maestro/baton"
 )
 
+var log = logrus.WithField("module", "Echo")
+
 type Echo struct {
 }
-
-var resp chan<- baton.Command
 
 func (e Echo) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 	resp = resp
@@ -20,10 +20,10 @@ func (e Echo) Init(cmd <-chan baton.Command, resp chan<- baton.Command) {
 		for {
 			tmp := <-cmd
 			if tmp.Call != "echo" {
-				log.Println("Echo: unknown command", tmp.Call)
+				log.WithField("command", tmp).Error("Unknown command")
 				continue
 			}
-			log.Println("Echo: processing command", tmp.ID)
+			log.WithField("command", tmp).Debug("Processing command")
 			resp <- tmp
 		}
 	}()
@@ -36,10 +36,9 @@ func (e Echo) Handler() *mux.Router {
 }
 
 func echo(w http.ResponseWriter, r *http.Request) {
-	log.Println("Echo: Recieved Message over HTTP")
+	log.Debug("Recieved Message over HTTP")
 	_, err := io.Copy(w, r.Body)
 	if err != nil {
-		log.Println("Echo:", "Error copying request body")
-		log.Println("Echo:", err)
+		log.WithField("error", err).Error("Error copying request body")
 	}
 }

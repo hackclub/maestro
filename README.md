@@ -1,6 +1,8 @@
 # Maestro
 
-**_Under Development_**
+**DEPRECATED**
+
+_**This repository has been deprecated and is no longer maintained**_
 
 Authors: [@TheThirdOne](https://github.com/TheThirdOne),
 [@zachlatta](https://github.com/zachlatta)
